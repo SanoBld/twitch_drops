@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../models/channel.dart';
 import '../models/drop_campaign.dart';
 import '../services/auth_service.dart';
 import '../services/gql_service.dart';
@@ -8,6 +7,7 @@ import '../services/mining_service.dart';
 import '../services/autostart_service.dart';
 import '../widgets/campaign_card.dart';
 import '../widgets/update_dialog.dart';
+import 'priority_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final AuthService auth;
@@ -32,6 +32,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _gql = GqlService(widget.auth);
     _campaignService = CampaignService(_gql);
     _miningService = MiningService(_gql);
+    _miningService.onChannelChanged.listen((_) {
+      if (mounted) setState(() {});
+    });
     _refresh();
     _autostart.isEnabled().then((v) {
       if (mounted) setState(() => _autostartEnabled = v);
@@ -41,14 +44,23 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _miningService.dispose();
+    super.dispose();
+  }
+
   Future<void> _refresh() async {
     setState(() => _loading = true);
     try {
       _campaigns = await _campaignService.fetchCampaigns();
+      if (_campaigns.isNotEmpty) {
+        await _miningService.start(_campaigns);
+      }
     } catch (_) {
       _campaigns = [];
     }
-    setState(() => _loading = false);
+    if (mounted) setState(() => _loading = false);
   }
 
   @override
@@ -57,6 +69,18 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Drops'),
         actions: [
+          IconButton(
+            tooltip: 'Game priority',
+            icon: const Icon(Icons.low_priority),
+            onPressed: _campaigns.isEmpty
+                ? null
+                : () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PriorityScreen(campaigns: _campaigns),
+                      ),
+                    ).then((_) => _miningService.start(_campaigns)),
+          ),
           IconButton(
             tooltip: _autostartEnabled
                 ? 'Disable start with system'

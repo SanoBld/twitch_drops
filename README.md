@@ -50,7 +50,7 @@ Without a fixed signing key, every CI build gets a random debug signature, and A
 5. Keep `release.keystore` somewhere safe outside the repo — losing it means future updates can never overwrite old installs again.
 
 ## Known gaps (next steps)
-- GQL operation hashes (sha256Hash) need to be captured from real Twitch network traffic, mine are placeholders
-- Channel priority/auto-switch logic not implemented yet (mining_service.dart only pings active channel)
+- GQL operation hashes (sha256Hash) need to be captured from real Twitch network traffic for `ViewerDropsDashboard`, `DirectoryPage_Game`, and `PlaybackAccessToken` — open Twitch in a browser, devtools > Network, filter `gql.twitch.tv`, inspect the request payloads. Without real hashes the app's network calls will fail.
 - Tray icon is a placeholder purple circle, swap assets/tray_icon.ico and .png for a real design later
 - Android build disabled by default in CI (see Android signing section)
+- Game priority + auto channel switching is implemented (`priority_screen.dart`, `mining_service.dart`): it ranks campaigns by your saved priority list, picks the most-viewed live channel for the top one with unclaimed drops, and re-checks every 2 minutes
