@@ -6,6 +6,7 @@ import '../services/gql_service.dart';
 import '../services/campaign_service.dart';
 import '../services/mining_service.dart';
 import '../widgets/campaign_card.dart';
+import '../widgets/update_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   final AuthService auth;
@@ -29,6 +30,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _campaignService = CampaignService(_gql);
     _miningService = MiningService(_gql);
     _refresh();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showUpdateDialogIfNeeded(context);
+    });
   }
 
   Future<void> _refresh() async {
