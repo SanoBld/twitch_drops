@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../services/gql_service.dart';
 import '../services/campaign_service.dart';
 import '../services/mining_service.dart';
+import '../services/autostart_service.dart';
 import '../widgets/campaign_card.dart';
 import '../widgets/update_dialog.dart';
 
@@ -20,6 +21,8 @@ class _HomeScreenState extends State<HomeScreen> {
   late final GqlService _gql;
   late final CampaignService _campaignService;
   late final MiningService _miningService;
+  final _autostart = AutostartService();
+  bool _autostartEnabled = false;
   List<DropCampaign> _campaigns = [];
   bool _loading = true;
 
@@ -30,6 +33,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _campaignService = CampaignService(_gql);
     _miningService = MiningService(_gql);
     _refresh();
+    _autostart.isEnabled().then((v) {
+      if (mounted) setState(() => _autostartEnabled = v);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       showUpdateDialogIfNeeded(context);
     });
@@ -51,6 +57,22 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Drops'),
         actions: [
+          IconButton(
+            tooltip: _autostartEnabled
+                ? 'Disable start with system'
+                : 'Enable start with system',
+            icon: Icon(_autostartEnabled ? Icons.power : Icons.power_off),
+            onPressed: () async {
+              if (_autostartEnabled) {
+                await _autostart.disable();
+              } else {
+                await _autostart.enable();
+              }
+              if (mounted) {
+                setState(() => _autostartEnabled = !_autostartEnabled);
+              }
+            },
+          ),
           IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
         ],
       ),

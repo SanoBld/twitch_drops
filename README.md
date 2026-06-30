@@ -4,10 +4,14 @@
 1. Install Flutter SDK, enable desktop: `flutter config --enable-windows-desktop` (or linux)
 2. `flutter create .` in this folder to generate platform files (windows/, linux/)
 3. `flutter pub get`
-4. `flutter run -d windows` (or linux)
+4. On Linux only: `sudo apt install libayatana-appindicator3-dev` (needed for tray icon support)
+5. `flutter run -d windows` (or linux)
 
 ## How auth works
-No login form. Paste your `auth-token` cookie from twitch.tv (devtools > Application > Cookies) on first launch. Stored locally via shared_preferences.
+TV-style device code login (like TDM/consoles): the app requests a code from Twitch, shows it on screen with a URL, and polls Twitch until you approve it on their site. No password, no cookie paste. Token stored locally via shared_preferences.
+
+## Background mode
+Closing the window hides it to the system tray instead of quitting (`window_manager` + `tray_manager`), mining keeps running. Click the tray icon or its "Show window" menu entry to bring it back, "Quit" to actually exit. A toggle in the app bar enables/disables launching automatically with the system (`launch_at_startup`), same role as TDM's registry entry.
 
 ## Structure
 - lib/services: Twitch GQL client, auth, websocket, mining loop, settings
@@ -48,6 +52,5 @@ Without a fixed signing key, every CI build gets a random debug signature, and A
 ## Known gaps (next steps)
 - GQL operation hashes (sha256Hash) need to be captured from real Twitch network traffic, mine are placeholders
 - Channel priority/auto-switch logic not implemented yet (mining_service.dart only pings active channel)
-- System tray / autostart packages added in pubspec but not wired in main.dart yet
-- No 2FA/captcha handling needed since auth is cookie-based
+- Tray icon is a placeholder purple circle, swap assets/tray_icon.ico and .png for a real design later
 - Android build disabled by default in CI (see Android signing section)

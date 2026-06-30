@@ -1,6 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Holds the Twitch session token (auth-token cookie value pasted by user).
+// Holds the Twitch access token obtained via device code login.
 class AuthService {
   static const _key = 'twitch_auth_token';
   String? token;
