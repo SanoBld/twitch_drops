@@ -7,15 +7,24 @@ class ChannelService {
   final GqlService gql;
   ChannelService(this.gql);
 
-  Future<List<Channel>> fetchLiveChannels(String gameId) async {
-    final res = await gql.query('DirectoryPage_Game', {
-      'slug': gameId,
-      'options': {
-        'sort': 'VIEWER_COUNT',
-        'recommendationsContext': {'platform': 'web'},
+  Future<List<Channel>> fetchLiveChannels(String gameSlug) async {
+    final res = await gql.query(
+      'DirectoryPage_Game',
+      {
+        'slug': gameSlug,
+        'imageWidth': 50,
+        'includeCostreaming': true,
+        'limit': 30,
+        'sortTypeIsRecency': false,
+        'options': {
+          'includeRestricted': ['SUB_ONLY_LIVE'],
+          'sort': 'VIEWER_COUNT',
+          'recommendationsContext': {'platform': 'web'},
+        },
       },
-      'limit': 30,
-    });
+      sha256Hash:
+          '86bcceb4e8b1a51256ff8eed8bd8aae4acacf80d737efe904f84f3aeadf8cafd',
+    );
 
     final edges = res['data']?['game']?['streams']?['edges'] as List? ?? [];
     return edges.map((e) {
@@ -24,7 +33,7 @@ class ChannelService {
         id: node['id'] ?? '',
         login: node['broadcaster']?['login'] ?? '',
         displayName: node['broadcaster']?['displayName'] ?? '',
-        gameId: gameId,
+        gameId: gameSlug,
         online: true,
         viewers: node['viewersCount'] ?? 0,
       );

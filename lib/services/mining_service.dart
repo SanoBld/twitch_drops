@@ -56,7 +56,8 @@ class MiningService {
       });
 
     for (final campaign in ordered) {
-      final channels = await _channelService.fetchLiveChannels(campaign.gameId);
+      final channels =
+          await _channelService.fetchLiveChannels(campaign.gameSlug);
       if (channels.isEmpty) continue;
       channels.sort((a, b) => b.viewers.compareTo(a.viewers));
       final candidate = channels.first;
@@ -70,15 +71,46 @@ class MiningService {
     }
   }
 
+  // Captured directly from Twitch devtools, sent as a raw query (not a
+  // persisted hash). If Twitch changes this query Twitch-side, capture a
+  // fresh one the same way: open a live stream, filter gql.twitch.tv,
+  // find "PlaybackAccessToken_Template", copy its "query" field.
+  static const _playbackAccessTokenQuery = '''
+query PlaybackAccessToken_Template(\$login: String!, \$isLive: Boolean!, \$vodID: ID!, \$isVod: Boolean!, \$playerType: String!, \$platform: String!) {
+  streamPlaybackAccessToken(channelName: \$login, params: {platform: \$platform, playerBackend: "mediaplayer", playerType: \$playerType}) @include(if: \$isLive) {
+    value
+    signature
+    authorization { isForbidden forbiddenReasonCode }
+    __typename
+  }
+  videoPlaybackAccessToken(id: \$vodID, params: {platform: \$platform, playerBackend: "mediaplayer", playerType: \$playerType}) @include(if: \$isVod) {
+    value
+    signature
+    __typename
+  }
+}''';
+
+  // IMPORTANT: this gets a playback token, which is required to "watch" a
+  // channel, but it likely does NOT by itself make drop progress advance.
+  // Twitch tracks actual watch-time via a separate "minute-watched" event
+  // sent to spade.twitch.tv/track (binary protobuf payload), not through GQL.
+  // This still needs to be captured and implemented — see README "Spade event".
   Future<void> _ping() async {
     if (activeChannel == null) return;
     try {
       // Stream-less watch ping: tells Twitch we're "watching" without video.
-      // NOTE: needs a real sha256Hash captured from Twitch traffic (see README).
-      await gql.query('PlaybackAccessToken', {
-        'login': activeChannel!.login,
-        'isLive': true,
-      });
+      await gql.rawQuery(
+        'PlaybackAccessToken_Template',
+        _playbackAccessTokenQuery,
+        {
+          'login': activeChannel!.login,
+          'isLive': true,
+          'isVod': false,
+          'vodID': '',
+          'playerType': 'site',
+          'platform': 'web',
+        },
+      );
     } catch (_) {
       // A failed ping likely means the channel went offline; re-pick next cycle.
     }

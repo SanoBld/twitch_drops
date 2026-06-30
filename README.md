@@ -50,7 +50,8 @@ Without a fixed signing key, every CI build gets a random debug signature, and A
 5. Keep `release.keystore` somewhere safe outside the repo — losing it means future updates can never overwrite old installs again.
 
 ## Known gaps (next steps)
-- GQL operation hashes (sha256Hash) need to be captured from real Twitch network traffic for `ViewerDropsDashboard`, `DirectoryPage_Game`, and `PlaybackAccessToken` — open Twitch in a browser, devtools > Network, filter `gql.twitch.tv`, inspect the request payloads. Without real hashes the app's network calls will fail.
+- GQL hashes captured so far: `ViewerDropsDashboard`, `DirectoryPage_Game`. `PlaybackAccessToken_Template` uses a raw query (not persisted hash), already wired in `mining_service.dart`.
+- **Critical missing piece: the Spade "minute-watched" event.** `PlaybackAccessToken` only authorizes watching a channel, it likely does NOT make drop progress advance by itself. Twitch tracks actual watch-time through a separate binary event sent to `https://spade.twitch.tv/track` (protobuf-encoded, base64'd in a `data` query param), roughly every 60 seconds while watching. This needs to be captured: open a live stream, filter devtools Network on `spade.twitch.tv`, find the periodic POST request, inspect its payload. This is the actual mechanism that makes drops progress, more important than the GQL hash work done so far.
 - Tray icon is a placeholder purple circle, swap assets/tray_icon.ico and .png for a real design later
 - Android build disabled by default in CI (see Android signing section)
 - Game priority + auto channel switching is implemented (`priority_screen.dart`, `mining_service.dart`): it ranks campaigns by your saved priority list, picks the most-viewed live channel for the top one with unclaimed drops, and re-checks every 2 minutes

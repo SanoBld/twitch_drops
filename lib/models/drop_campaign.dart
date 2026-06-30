@@ -2,6 +2,7 @@ class DropCampaign {
   final String id;
   final String gameName;
   final String gameId;
+  final String gameSlug;
   final String name;
   final DateTime endAt;
   final List<TimeBasedDrop> drops;
@@ -10,6 +11,7 @@ class DropCampaign {
     required this.id,
     required this.gameName,
     required this.gameId,
+    required this.gameSlug,
     required this.name,
     required this.endAt,
     required this.drops,
@@ -20,6 +22,7 @@ class DropCampaign {
       id: j['id'] ?? '',
       gameName: j['game']?['name'] ?? '',
       gameId: j['game']?['id'] ?? '',
+      gameSlug: j['game']?['slug'] ?? '',
       name: j['name'] ?? '',
       endAt: DateTime.tryParse(j['endAt'] ?? '') ?? DateTime.now(),
       drops: ((j['timeBasedDrops'] ?? []) as List)
