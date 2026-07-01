@@ -1,42 +1,73 @@
 import 'package:window_manager/window_manager.dart';
 import 'package:tray_manager/tray_manager.dart';
 
-// Handles minimize-to-tray behavior, similar to TDM running in the background.
 class TrayService with TrayListener, WindowListener {
   final void Function() onShowWindow;
   final void Function() onQuit;
+  final void Function() onStopMining;
 
-  TrayService({required this.onShowWindow, required this.onQuit});
+  String? _miningChannel;
+
+  TrayService({
+    required this.onShowWindow,
+    required this.onQuit,
+    required this.onStopMining,
+  });
 
   Future<void> init() async {
     trayManager.addListener(this);
     windowManager.addListener(this);
-    await windowManager.setPreventClose(true); // intercept close button
-
-    await trayManager.setIcon(
-      // Windows needs .ico, Linux/macOS can use .png
-      'assets/tray_icon.ico',
-    );
+    await windowManager.setPreventClose(true);
+    await trayManager.setIcon('assets/tray_icon.ico');
     await trayManager.setToolTip('Twitch Drops Miner');
-    await trayManager.setContextMenu(Menu(items: [
+    await _rebuildMenu();
+  }
+
+  // Call this whenever the mined channel changes so the tray menu reflects it.
+  Future<void> updateMiningStatus(String? channelName) async {
+    _miningChannel = channelName;
+    await trayManager.setToolTip(
+      channelName != null
+          ? 'Twitch Drops Miner — Mining $channelName'
+          : 'Twitch Drops Miner — Idle',
+    );
+    await _rebuildMenu();
+  }
+
+  Future<void> _rebuildMenu() async {
+    final items = <MenuItem>[
       MenuItem(key: 'show', label: 'Show window'),
       MenuItem.separator(),
+      if (_miningChannel != null) ...[
+        MenuItem(
+          key: 'status',
+          label: '⚡ Mining: $_miningChannel',
+          disabled: true,
+        ),
+        MenuItem(key: 'stop', label: 'Stop mining'),
+      ] else
+        MenuItem(key: 'status', label: 'Idle', disabled: true),
+      MenuItem.separator(),
       MenuItem(key: 'quit', label: 'Quit'),
-    ]));
+    ];
+    await trayManager.setContextMenu(Menu(items: items));
   }
 
   @override
-  void onTrayIconMouseDown() {
-    onShowWindow();
-  }
+  void onTrayIconMouseDown() => onShowWindow();
 
   @override
-  void onTrayMenuItemClick(MenuItem menuItem) {
-    if (menuItem.key == 'show') onShowWindow();
-    if (menuItem.key == 'quit') onQuit();
+  void onTrayMenuItemClick(MenuItem item) {
+    switch (item.key) {
+      case 'show':
+        onShowWindow();
+      case 'stop':
+        onStopMining();
+      case 'quit':
+        onQuit();
+    }
   }
 
-  // Instead of closing the app, hide it to tray and keep mining in background.
   @override
   void onWindowClose() async {
     await windowManager.hide();

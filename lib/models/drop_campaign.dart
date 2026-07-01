@@ -4,6 +4,7 @@ class DropCampaign {
   final String gameId;
   final String gameSlug;
   final String name;
+  final String status;
   final DateTime endAt;
   final List<TimeBasedDrop> drops;
 
@@ -13,9 +14,12 @@ class DropCampaign {
     required this.gameId,
     required this.gameSlug,
     required this.name,
+    required this.status,
     required this.endAt,
     required this.drops,
   });
+
+  bool get isActive => status == 'ACTIVE';
 
   factory DropCampaign.fromJson(Map<String, dynamic> j) {
     return DropCampaign(
@@ -24,6 +28,7 @@ class DropCampaign {
       gameId: j['game']?['id'] ?? '',
       gameSlug: j['game']?['slug'] ?? '',
       name: j['name'] ?? '',
+      status: j['status'] ?? '',
       endAt: DateTime.tryParse(j['endAt'] ?? '') ?? DateTime.now(),
       drops: ((j['timeBasedDrops'] ?? []) as List)
           .map((d) => TimeBasedDrop.fromJson(d))
@@ -48,13 +53,18 @@ class TimeBasedDrop {
   });
 
   factory TimeBasedDrop.fromJson(Map<String, dynamic> j) {
+    final self = j['self'] as Map<String, dynamic>? ?? {};
     return TimeBasedDrop(
       id: j['id'] ?? '',
       name: j['name'] ?? '',
       requiredMinutes: j['requiredMinutesWatched'] ?? 0,
+      currentMinutes: self['currentMinutesWatched'] ?? 0,
+      claimed: self['isClaimed'] ?? false,
     );
   }
 
   double get progress =>
-      requiredMinutes == 0 ? 0 : (currentMinutes / requiredMinutes).clamp(0, 1);
+      requiredMinutes == 0 ? 0 : (currentMinutes / requiredMinutes).clamp(0.0, 1.0);
+
+  int get remainingMinutes => (requiredMinutes - currentMinutes).clamp(0, requiredMinutes);
 }

@@ -11,8 +11,8 @@ void main() async {
   await windowManager.ensureInitialized();
 
   const windowOptions = WindowOptions(
-    size: Size(900, 650),
-    minimumSize: Size(700, 500),
+    size: Size(960, 660),
+    minimumSize: Size(720, 520),
     center: true,
     title: 'Twitch Drops Miner',
   );
@@ -29,6 +29,10 @@ void main() async {
     onQuit: () async {
       await windowManager.setPreventClose(false);
       await windowManager.close();
+    },
+    onStopMining: () {
+      // Handled by HomeScreen via stream; just show window so user sees it.
+      windowManager.show();
     },
   );
   await trayService.init();

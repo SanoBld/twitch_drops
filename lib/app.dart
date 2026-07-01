@@ -23,17 +23,25 @@ class _AppState extends State<App> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Twitch Drops',
+      title: 'Twitch Drops Miner',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorSchemeSeed: Colors.deepPurple,
+        colorSchemeSeed: const Color(0xFF9146FF), // Twitch purple
         useMaterial3: true,
         brightness: Brightness.dark,
+        cardTheme: const CardThemeData(elevation: 0),
       ),
       home: !_ready
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : _auth.isLoggedIn
-              ? HomeScreen(auth: _auth)
-              : LoginScreen(auth: _auth, onLoggedIn: () => setState(() {})),
+              ? HomeScreen(
+                  auth: _auth,
+                  onLogout: () => setState(() {}),
+                )
+              : LoginScreen(
+                  auth: _auth,
+                  onLoggedIn: () => setState(() {}),
+                ),
     );
   }
 }
