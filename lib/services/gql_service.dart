@@ -1,14 +1,23 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'twitch_constants.dart';
 import 'auth_service.dart';
 
-// Sends GQL requests to Twitch internal API.
 class GqlService {
   final AuthService auth;
   final Dio _dio = Dio();
 
   GqlService(this.auth);
 
+  Map<String, String> get _headers => {
+        'Client-Id': TwitchConstants.clientId,
+        'Authorization': 'OAuth ${auth.token}',
+        'Content-Type': 'application/json',
+        'User-Agent': TwitchConstants.userAgent,
+      };
+
+  // Persisted query (with sha256Hash) or plain operation (without).
   Future<Map<String, dynamic>> query(
     String operationName,
     Map<String, dynamic> variables, {
@@ -27,38 +36,109 @@ class GqlService {
     final res = await _dio.post(
       TwitchConstants.gqlUrl,
       data: body,
-      options: Options(headers: {
-        'Client-Id': TwitchConstants.clientId,
-        'Authorization': 'OAuth ${auth.token}',
-        'Content-Type': 'application/json',
-        'User-Agent': TwitchConstants.userAgent,
-      }),
+      options: Options(headers: _headers),
     );
     return res.data as Map<String, dynamic>;
   }
 
-  // For requests Twitch sends as a raw query string instead of a persisted
-  // hash (e.g. PlaybackAccessToken). Pass the exact `query` field captured
-  // from devtools.
+  // Raw query string (non-persisted), used for PlaybackAccessToken.
   Future<Map<String, dynamic>> rawQuery(
+    String queryStr,
     String operationName,
-    String rawQueryString,
     Map<String, dynamic> variables,
   ) async {
     final res = await _dio.post(
       TwitchConstants.gqlUrl,
       data: {
         'operationName': operationName,
-        'query': rawQueryString,
+        'query': queryStr,
         'variables': variables,
       },
-      options: Options(headers: {
-        'Client-Id': TwitchConstants.clientId,
-        'Authorization': 'OAuth ${auth.token}',
-        'Content-Type': 'application/json',
-        'User-Agent': TwitchConstants.userAgent,
-      }),
+      options: Options(headers: _headers),
     );
     return res.data as Map<String, dynamic>;
+  }
+
+  // Sends the Spade "minute-watched" event via sendSpadeEvents GQL mutation.
+  // Payload is a JSON array encoded as GZIP then Base64.
+  Future<void> sendMinuteWatched({
+    required String channelId,
+    required String broadcastId,
+    required String channelLogin,
+    required String gameId,
+    required String gameName,
+    required String userId,
+    required String userLogin,
+  }) async {
+    final payload = [
+      {
+        'event': 'minute-watched',
+        'properties': {
+          'broadcast_id': broadcastId,
+          'channel': channelLogin,
+          'channel_id': channelId,
+          'client_time': DateTime.now().millisecondsSinceEpoch / 1000.0,
+          'game': gameName,
+          'game_id': gameId,
+          'hidden': false,
+          'is_live': true,
+          'live': true,
+          'logged_in': true,
+          'login': userLogin,
+          'minutes_logged': 1,
+          'muted': false,
+          'platform': 'web',
+          'player': 'site',
+          'user_id': int.tryParse(userId) ?? 0,
+        }
+      }
+    ];
+
+    final jsonBytes = utf8.encode(jsonEncode(payload));
+    final gzipped = GZipCodec().encode(jsonBytes);
+    final b64 = base64Encode(gzipped);
+
+    const mutation = '''
+  mutation SendEvents(\$input: SendSpadeEventsInput!) {
+    sendSpadeEvents(input: \$input) {
+      statusCode
+    }
+  }
+''';
+
+    await _dio.post(
+      TwitchConstants.gqlUrl,
+      data: {
+        'query': mutation,
+        'variables': {
+          'input': {
+            'data': b64,
+            'encoding': 'GZIP_B64',
+            'repository': 'twilight',
+          }
+        },
+      },
+      options: Options(headers: _headers),
+    );
+  }
+
+  // Fetches the logged-in user's ID and login from GQL.
+  Future<Map<String, String>?> fetchCurrentUser() async {
+    try {
+      const q = '{ currentUser { id login } }';
+      final res = await _dio.post(
+        TwitchConstants.gqlUrl,
+        data: {'query': q},
+        options: Options(headers: _headers),
+      );
+      final user = (res.data as Map<String, dynamic>)['data']?['currentUser'];
+      if (user == null) return null;
+      return {
+        'id': user['id']?.toString() ?? '',
+        'login': user['login']?.toString() ?? '',
+      };
+    } catch (_) {
+      return null;
+    }
   }
 }

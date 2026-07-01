@@ -5,9 +5,8 @@ import 'gql_service.dart';
 import 'channel_service.dart';
 import 'settings_service.dart';
 
-// Picks the best channel to mine based on the priority list, watches it
-// with periodic pings, and switches automatically if it goes offline or a
-// higher priority game becomes available. Mirrors TDM's auto-switch behavior.
+// Mines drop campaigns by sending the Spade "minute-watched" GQL event once
+// per minute, without streaming video. Mirrors TDM's stream-less approach.
 class MiningService {
   final GqlService gql;
   late final ChannelService _channelService;
@@ -17,9 +16,10 @@ class MiningService {
   Timer? _switchCheckTimer;
   Channel? activeChannel;
   List<DropCampaign> _campaigns = [];
-  final _statusController = StreamController<Channel?>.broadcast();
+  String _userId = '';
+  String _userLogin = '';
 
-  // Listen to this to react to channel changes in the UI.
+  final _statusController = StreamController<Channel?>.broadcast();
   Stream<Channel?> get onChannelChanged => _statusController.stream;
 
   MiningService(this.gql) {
@@ -28,19 +28,30 @@ class MiningService {
 
   Future<void> start(List<DropCampaign> campaigns) async {
     _campaigns = campaigns;
+
+    // Fetch user info once so we can include it in minute-watched payloads.
+    if (_userId.isEmpty) {
+      final user = await gql.fetchCurrentUser();
+      if (user != null) {
+        _userId = user['id'] ?? '';
+        _userLogin = user['login'] ?? '';
+      }
+    }
+
     await _pickBestChannel();
+
     _pingTimer?.cancel();
-    _pingTimer = Timer.periodic(const Duration(seconds: 20), (_) => _ping());
+    // Send minute-watched every 60s (Twitch counts one minute per event).
+    _pingTimer = Timer.periodic(const Duration(seconds: 60), (_) => _ping());
+
     _switchCheckTimer?.cancel();
+    // Re-evaluate best channel every 2 minutes.
     _switchCheckTimer = Timer.periodic(
       const Duration(minutes: 2),
       (_) => _pickBestChannel(),
     );
   }
 
-  // Picks a live channel for the highest-priority game that still has
-  // unclaimed drops, falling back to any available campaign if no
-  // priority list is set (mirrors TDM's Priority Mode fallback).
   Future<void> _pickBestChannel() async {
     final priority = await _settings.loadPriority();
     final eligible = _campaigns.where((c) => c.drops.any((d) => !d.claimed));
@@ -56,63 +67,41 @@ class MiningService {
       });
 
     for (final campaign in ordered) {
-      final channels =
-          await _channelService.fetchLiveChannels(campaign.gameSlug);
+      final channels = await _channelService.fetchLiveChannels(
+        campaign.gameSlug,
+        campaign.gameId,
+        campaign.gameName,
+      );
       if (channels.isEmpty) continue;
       channels.sort((a, b) => b.viewers.compareTo(a.viewers));
       final candidate = channels.first;
 
-      // Already mining the best option, nothing to do.
-      if (activeChannel?.id == candidate.id) return;
+      if (activeChannel?.broadcastId == candidate.broadcastId) return;
 
       activeChannel = candidate;
       _statusController.add(activeChannel);
+
+      // Send first ping immediately after switching channel.
+      _ping();
       return;
     }
   }
 
-  // Captured directly from Twitch devtools, sent as a raw query (not a
-  // persisted hash). If Twitch changes this query Twitch-side, capture a
-  // fresh one the same way: open a live stream, filter gql.twitch.tv,
-  // find "PlaybackAccessToken_Template", copy its "query" field.
-  static const _playbackAccessTokenQuery = '''
-query PlaybackAccessToken_Template(\$login: String!, \$isLive: Boolean!, \$vodID: ID!, \$isVod: Boolean!, \$playerType: String!, \$platform: String!) {
-  streamPlaybackAccessToken(channelName: \$login, params: {platform: \$platform, playerBackend: "mediaplayer", playerType: \$playerType}) @include(if: \$isLive) {
-    value
-    signature
-    authorization { isForbidden forbiddenReasonCode }
-    __typename
-  }
-  videoPlaybackAccessToken(id: \$vodID, params: {platform: \$platform, playerBackend: "mediaplayer", playerType: \$playerType}) @include(if: \$isVod) {
-    value
-    signature
-    __typename
-  }
-}''';
-
-  // IMPORTANT: this gets a playback token, which is required to "watch" a
-  // channel, but it likely does NOT by itself make drop progress advance.
-  // Twitch tracks actual watch-time via a separate "minute-watched" event
-  // sent to spade.twitch.tv/track (binary protobuf payload), not through GQL.
-  // This still needs to be captured and implemented — see README "Spade event".
   Future<void> _ping() async {
-    if (activeChannel == null) return;
+    final ch = activeChannel;
+    if (ch == null || _userId.isEmpty) return;
     try {
-      // Stream-less watch ping: tells Twitch we're "watching" without video.
-      await gql.rawQuery(
-        'PlaybackAccessToken_Template',
-        _playbackAccessTokenQuery,
-        {
-          'login': activeChannel!.login,
-          'isLive': true,
-          'isVod': false,
-          'vodID': '',
-          'playerType': 'site',
-          'platform': 'web',
-        },
+      await gql.sendMinuteWatched(
+        channelId: ch.id,
+        broadcastId: ch.broadcastId,
+        channelLogin: ch.login,
+        gameId: ch.gameId,
+        gameName: ch.gameName,
+        userId: _userId,
+        userLogin: _userLogin,
       );
     } catch (_) {
-      // A failed ping likely means the channel went offline; re-pick next cycle.
+      // Failed ping likely means channel went offline; re-pick next cycle.
     }
   }
 
