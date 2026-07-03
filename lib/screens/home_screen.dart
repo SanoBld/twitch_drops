@@ -83,8 +83,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Scaffold(
       body: Row(
         children: [
@@ -365,7 +363,10 @@ class _DropsTab extends StatelessWidget {
                   style: tt.titleMedium),
               const SizedBox(height: 8),
               Text(
-                'Make sure your Twitch account is linked to game accounts on twitch.tv/drops/campaigns',
+                'Make sure:\n'
+                '\u2022 Your Twitch account is linked to game accounts on twitch.tv/drops/campaigns\n'
+                '\u2022 There are active drop campaigns for linked games\n'
+                '\u2022 The account has not already claimed all drops',
                 style:
                     tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 textAlign: TextAlign.center,

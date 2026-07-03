@@ -19,20 +19,21 @@ class DropCampaign {
     required this.drops,
   });
 
-  bool get isActive => status == 'ACTIVE';
+  bool get isActive => status.isEmpty || status == 'ACTIVE';
 
   factory DropCampaign.fromJson(Map<String, dynamic> j) {
+    // Drops can be under 'timeBasedDrops' or 'drops' depending on API version
+    final rawDrops = (j['timeBasedDrops'] ?? j['drops'] ?? []) as List;
     return DropCampaign(
       id: j['id'] ?? '',
-      gameName: j['game']?['name'] ?? '',
-      gameId: j['game']?['id'] ?? '',
-      gameSlug: j['game']?['slug'] ?? '',
+      gameName: j['game']?['name'] ?? j['gameName'] ?? '',
+      gameId: j['game']?['id'] ?? j['gameId'] ?? '',
+      gameSlug: j['game']?['slug'] ?? j['gameSlug'] ?? '',
       name: j['name'] ?? '',
       status: j['status'] ?? '',
-      endAt: DateTime.tryParse(j['endAt'] ?? '') ?? DateTime.now(),
-      drops: ((j['timeBasedDrops'] ?? []) as List)
-          .map((d) => TimeBasedDrop.fromJson(d))
-          .toList(),
+      endAt: DateTime.tryParse(j['endAt'] ?? '') ??
+          DateTime.now().add(const Duration(days: 30)),
+      drops: rawDrops.map((d) => TimeBasedDrop.fromJson(d)).toList(),
     );
   }
 }
@@ -53,18 +54,20 @@ class TimeBasedDrop {
   });
 
   factory TimeBasedDrop.fromJson(Map<String, dynamic> j) {
-    final self = j['self'] as Map<String, dynamic>? ?? {};
+    // Progress lives under 'self' object
+    final self = (j['self'] ?? j['userDropInventory'] ?? {}) as Map<String, dynamic>;
     return TimeBasedDrop(
       id: j['id'] ?? '',
       name: j['name'] ?? '',
-      requiredMinutes: j['requiredMinutesWatched'] ?? 0,
-      currentMinutes: self['currentMinutesWatched'] ?? 0,
-      claimed: self['isClaimed'] ?? false,
+      requiredMinutes: j['requiredMinutesWatched'] ?? j['requiredMinutes'] ?? 0,
+      currentMinutes: self['currentMinutesWatched'] ?? self['currentMinutes'] ?? 0,
+      claimed: self['isClaimed'] ?? self['claimed'] ?? false,
     );
   }
 
   double get progress =>
       requiredMinutes == 0 ? 0 : (currentMinutes / requiredMinutes).clamp(0.0, 1.0);
 
-  int get remainingMinutes => (requiredMinutes - currentMinutes).clamp(0, requiredMinutes);
+  int get remainingMinutes =>
+      (requiredMinutes - currentMinutes).clamp(0, requiredMinutes);
 }

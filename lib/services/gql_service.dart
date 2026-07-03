@@ -122,6 +122,24 @@ class GqlService {
     );
   }
 
+  // Fetches full drop details (including timeBasedDrops + self progress)
+  // for a single campaign. ViewerDropsDashboard only gives the summary.
+  Future<Map<String, dynamic>> fetchCampaignDetails({
+    required String channelLogin,
+    required String dropId,
+  }) async {
+    final res = await query(
+      'DropCampaignDetails',
+      {
+        'channelLogin': channelLogin,
+        'dropID': dropId,
+      },
+      sha256Hash:
+          '039277bf98f3130929262cc7c6efd9c141ca3749cb6dca442fc8ead9a53f77c1',
+    );
+    return res;
+  }
+
   // Fetches the logged-in user's ID and login from GQL.
   Future<Map<String, String>?> fetchCurrentUser() async {
     try {
