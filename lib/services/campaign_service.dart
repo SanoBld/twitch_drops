@@ -5,6 +5,7 @@ import 'log_service.dart';
 class CampaignService {
   final GqlService gql;
   final _log = LogService();
+
   CampaignService(this.gql);
 
   Future<List<DropCampaign>> fetchCampaigns() async {
@@ -35,6 +36,7 @@ class CampaignService {
     }
 
     final userLogin = user['login']?.toString() ?? '';
+    _log.log('Logged in as: $userLogin', tag: 'CampaignService');
 
     final rawList = (user['dropCampaigns'] as List?) ??
         (user['inventory']?['dropCampaignsInProgress'] as List?) ??
@@ -58,6 +60,7 @@ class CampaignService {
     final campaigns = <DropCampaign>[];
     for (final c in candidates) {
       final id = (c as Map<String, dynamic>)['id'] as String?;
+      final name = c['name']?.toString() ?? '?';
       if (id == null || userLogin.isEmpty) continue;
       try {
         final detailRes = await gql.fetchCampaignDetails(
@@ -65,8 +68,13 @@ class CampaignService {
           dropId: id,
         );
         final campaignJson = detailRes['data']?['user']?['dropCampaign'];
+        if (detailRes['errors'] != null) {
+          _log.log(
+              'CampaignDetails errors for "$name": ${detailRes['errors']}',
+              tag: 'CampaignService');
+        }
         if (campaignJson == null) {
-          _log.log('No details for campaign $id, falling back to summary',
+          _log.log('No details for campaign "$name" ($id), using summary',
               tag: 'CampaignService');
           campaigns.add(DropCampaign.fromJson(c));
           continue;
@@ -74,7 +82,7 @@ class CampaignService {
         campaigns
             .add(DropCampaign.fromJson(campaignJson as Map<String, dynamic>));
       } catch (e) {
-        _log.log('fetchCampaignDetails failed for $id: $e',
+        _log.log('fetchCampaignDetails threw for "$name" ($id): $e',
             tag: 'CampaignService');
         campaigns.add(DropCampaign.fromJson(c));
       }

@@ -1,45 +1,57 @@
 import 'dart:async';
 
-/// Simple in-memory log buffer so logs can be inspected from inside the
-/// running app (useful on release builds / when the user has no console).
+// Single log entry with timestamp, tag (source) and message.
 class LogEntry {
   final DateTime time;
   final String tag;
   final String message;
 
-  LogEntry(this.tag, this.message) : time = DateTime.now();
+  LogEntry(this.time, this.tag, this.message);
 
   @override
   String toString() {
-    final t = time.toIso8601String().substring(11, 19); // HH:MM:SS
-    return '[$t] [$tag] $message';
+    final ts = time.toIso8601String().substring(11, 19);
+    return '[$ts] [$tag] $message';
   }
 }
 
+// In-memory log buffer, viewable directly in the app (no console needed).
+// Singleton via a default (unnamed) constructor, so `LogService()` anywhere
+// in the app always returns the same shared instance.
 class LogService {
   static final LogService _instance = LogService._internal();
   factory LogService() => _instance;
   LogService._internal();
 
   static const int _maxEntries = 500;
-
   final List<LogEntry> _entries = [];
-  final _controller = StreamController<List<LogEntry>>.broadcast();
+
+  final StreamController<void> _changeController =
+      StreamController<void>.broadcast();
 
   List<LogEntry> get entries => List.unmodifiable(_entries);
-  Stream<List<LogEntry>> get onChanged => _controller.stream;
+
+  // debug_screen.dart does: _log.onChanged.listen((_) => setState(...))
+  Stream<void> get onChanged => _changeController.stream;
 
   void log(String message, {String tag = 'App'}) {
-    _entries.add(LogEntry(tag, message));
+    final entry = LogEntry(DateTime.now(), tag, message);
+    _entries.add(entry);
     if (_entries.length > _maxEntries) {
       _entries.removeAt(0);
     }
-    _controller.add(entries);
+    // ignore: avoid_print
+    print(entry);
+    if (!_changeController.isClosed) {
+      _changeController.add(null);
+    }
   }
 
   void clear() {
     _entries.clear();
-    _controller.add(entries);
+    if (!_changeController.isClosed) {
+      _changeController.add(null);
+    }
   }
 
   String exportAsText() => _entries.map((e) => e.toString()).join('\n');

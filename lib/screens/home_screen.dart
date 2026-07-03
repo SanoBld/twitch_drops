@@ -379,7 +379,8 @@ class _DropsTab extends StatelessWidget {
                 'Make sure:\n'
                 '\u2022 Your Twitch account is linked to game accounts on twitch.tv/drops/campaigns\n'
                 '\u2022 There are active drop campaigns for linked games\n'
-                '\u2022 The account has not already claimed all drops',
+                '\u2022 The account has not already claimed all drops\n\n'
+                'Tap the bug icon (top right) to see the debug logs.',
                 style:
                     tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 textAlign: TextAlign.center,
