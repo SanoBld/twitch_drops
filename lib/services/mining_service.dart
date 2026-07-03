@@ -4,6 +4,7 @@ import '../models/drop_campaign.dart';
 import 'gql_service.dart';
 import 'channel_service.dart';
 import 'settings_service.dart';
+import 'log_service.dart';
 
 // Mines drop campaigns by sending the Spade "minute-watched" GQL event once
 // per minute, without streaming video. Mirrors TDM's stream-less approach.
@@ -11,6 +12,7 @@ class MiningService {
   final GqlService gql;
   late final ChannelService _channelService;
   final SettingsService _settings = SettingsService();
+  final _log = LogService();
 
   Timer? _pingTimer;
   Timer? _switchCheckTimer;
@@ -54,8 +56,25 @@ class MiningService {
 
   Future<void> _pickBestChannel() async {
     final priority = await _settings.loadPriority();
-    final eligible = _campaigns.where((c) => c.drops.any((d) => !d.claimed));
-    if (eligible.isEmpty) return;
+
+    // Only consider campaigns that are:
+    // - linked (isAccountConnected) — otherwise progress is never counted
+    // - have at least one unclaimed drop
+    // - actually have a usable game slug to search channels with
+    final eligible = _campaigns.where((c) =>
+        c.isAccountConnected &&
+        c.drops.any((d) => !d.claimed) &&
+        c.gameSlug.isNotEmpty);
+
+    if (eligible.isEmpty) {
+      _log.log(
+        'No eligible campaigns to mine (need: account linked + '
+        'unclaimed drop + valid game). ${_campaigns.length} total campaigns, '
+        '${_campaigns.where((c) => c.isAccountConnected).length} linked.',
+        tag: 'MiningService',
+      );
+      return;
+    }
 
     final ordered = eligible.toList()
       ..sort((a, b) {
@@ -67,24 +86,54 @@ class MiningService {
       });
 
     for (final campaign in ordered) {
-      final channels = await _channelService.fetchLiveChannels(
-        campaign.gameSlug,
-        campaign.gameId,
-        campaign.gameName,
-      );
-      if (channels.isEmpty) continue;
+      List<Channel> channels;
+      try {
+        channels = await _channelService.fetchLiveChannels(
+          campaign.gameSlug,
+          campaign.gameId,
+          campaign.gameName,
+        );
+      } catch (e) {
+        _log.log(
+          'fetchLiveChannels failed for "${campaign.gameName}" '
+          '(slug: ${campaign.gameSlug}): $e',
+          tag: 'MiningService',
+        );
+        continue;
+      }
+
+      if (channels.isEmpty) {
+        _log.log(
+          'No live channels found for "${campaign.gameName}" '
+          '(slug: ${campaign.gameSlug}), trying next campaign',
+          tag: 'MiningService',
+        );
+        continue;
+      }
+
       channels.sort((a, b) => b.viewers.compareTo(a.viewers));
       final candidate = channels.first;
 
       if (activeChannel?.broadcastId == candidate.broadcastId) return;
 
       activeChannel = candidate;
+      _log.log(
+        'Now mining "${campaign.gameName}" on channel '
+        '${candidate.displayName} (${candidate.viewers} viewers)',
+        tag: 'MiningService',
+      );
       _statusController.add(activeChannel);
 
       // Send first ping immediately after switching channel.
       _ping();
       return;
     }
+
+    _log.log(
+      'Went through ${ordered.length} eligible campaigns but found no live '
+      'channel to mine on any of them.',
+      tag: 'MiningService',
+    );
   }
 
   Future<void> _ping() async {
@@ -100,7 +149,8 @@ class MiningService {
         userId: _userId,
         userLogin: _userLogin,
       );
-    } catch (_) {
+    } catch (e) {
+      _log.log('Ping failed for ${ch.login}: $e', tag: 'MiningService');
       // Failed ping likely means channel went offline; re-pick next cycle.
     }
   }

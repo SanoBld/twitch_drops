@@ -7,6 +7,11 @@ class DropCampaign {
   final String status;
   final DateTime endAt;
   final List<TimeBasedDrop> drops;
+  // Whether the user's Twitch account is linked to the game's publisher
+  // account. If false, watching streams will NEVER progress this drop,
+  // no matter how long you mine it — Twitch silently ignores progress
+  // for unlinked accounts.
+  final bool isAccountConnected;
 
   DropCampaign({
     required this.id,
@@ -17,6 +22,7 @@ class DropCampaign {
     required this.status,
     required this.endAt,
     required this.drops,
+    this.isAccountConnected = true,
   });
 
   bool get isActive => status.isEmpty || status == 'ACTIVE';
@@ -24,17 +30,47 @@ class DropCampaign {
   factory DropCampaign.fromJson(Map<String, dynamic> j) {
     // Drops can be under 'timeBasedDrops' or 'drops' depending on API version
     final rawDrops = (j['timeBasedDrops'] ?? j['drops'] ?? []) as List;
+    final game = j['game'] as Map<String, dynamic>?;
+
+    // Twitch's ViewerDropsDashboard/DropCampaignDetails responses expose
+    // the game name as 'displayName', not 'name'. Fall back to 'name' /
+    // 'gameName' just in case a different query shape is ever used.
+    final gameName = game?['displayName'] ?? game?['name'] ?? j['gameName'] ?? '';
+
+    // The API doesn't return a directory slug for the game in this query.
+    // Twitch's actual directory slugs are (almost always) just the kebab
+    // case of the display name, so derive it the same way when it's not
+    // provided directly.
+    final rawSlug = game?['slug'] ?? j['gameSlug'];
+    final gameSlug = (rawSlug != null && (rawSlug as String).isNotEmpty)
+        ? rawSlug
+        : _slugify(gameName as String);
+
+    final self = j['self'] as Map<String, dynamic>?;
+
     return DropCampaign(
       id: j['id'] ?? '',
-      gameName: j['game']?['name'] ?? j['gameName'] ?? '',
-      gameId: j['game']?['id'] ?? j['gameId'] ?? '',
-      gameSlug: j['game']?['slug'] ?? j['gameSlug'] ?? '',
+      gameName: gameName,
+      gameId: game?['id'] ?? j['gameId'] ?? '',
+      gameSlug: gameSlug,
       name: j['name'] ?? '',
       status: j['status'] ?? '',
       endAt: DateTime.tryParse(j['endAt'] ?? '') ??
           DateTime.now().add(const Duration(days: 30)),
       drops: rawDrops.map((d) => TimeBasedDrop.fromJson(d)).toList(),
+      // Default to true when unknown, so we don't accidentally hide a
+      // campaign just because this specific field was missing.
+      isAccountConnected: self?['isAccountConnected'] as bool? ?? true,
     );
+  }
+
+  // Approximates Twitch's directory slug format: lowercase, spaces and
+  // most punctuation become single dashes, no leading/trailing dashes.
+  // e.g. "Call of Duty: Warzone" -> "call-of-duty-warzone"
+  static String _slugify(String name) {
+    final lower = name.toLowerCase().trim();
+    final replaced = lower.replaceAll(RegExp(r"[^a-z0-9]+"), '-');
+    return replaced.replaceAll(RegExp(r'^-+|-+$'), '');
   }
 }
 
