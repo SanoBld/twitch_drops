@@ -3,10 +3,12 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'twitch_constants.dart';
 import 'auth_service.dart';
+import 'log_service.dart';
 
 class GqlService {
   final AuthService auth;
   final Dio _dio = Dio();
+  final _log = LogService();
 
   GqlService(this.auth);
 
@@ -33,12 +35,21 @@ class GqlService {
             }
           };
 
-    final res = await _dio.post(
-      TwitchConstants.gqlUrl,
-      data: body,
-      options: Options(headers: _headers),
-    );
-    return res.data as Map<String, dynamic>;
+    try {
+      final res = await _dio.post(
+        TwitchConstants.gqlUrl,
+        data: body,
+        options: Options(headers: _headers),
+      );
+      return res.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      _log.log(
+        'query($operationName) failed: ${e.response?.statusCode} '
+        '${e.response?.data ?? e.message}',
+        tag: 'GqlService',
+      );
+      rethrow;
+    }
   }
 
   // Raw query string (non-persisted), used for PlaybackAccessToken.
@@ -47,16 +58,25 @@ class GqlService {
     String operationName,
     Map<String, dynamic> variables,
   ) async {
-    final res = await _dio.post(
-      TwitchConstants.gqlUrl,
-      data: {
-        'operationName': operationName,
-        'query': queryStr,
-        'variables': variables,
-      },
-      options: Options(headers: _headers),
-    );
-    return res.data as Map<String, dynamic>;
+    try {
+      final res = await _dio.post(
+        TwitchConstants.gqlUrl,
+        data: {
+          'operationName': operationName,
+          'query': queryStr,
+          'variables': variables,
+        },
+        options: Options(headers: _headers),
+      );
+      return res.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      _log.log(
+        'rawQuery($operationName) failed: ${e.response?.statusCode} '
+        '${e.response?.data ?? e.message}',
+        tag: 'GqlService',
+      );
+      rethrow;
+    }
   }
 
   // Sends the Spade "minute-watched" event via sendSpadeEvents GQL mutation.
@@ -106,20 +126,29 @@ class GqlService {
   }
 ''';
 
-    await _dio.post(
-      TwitchConstants.gqlUrl,
-      data: {
-        'query': mutation,
-        'variables': {
-          'input': {
-            'data': b64,
-            'encoding': 'GZIP_B64',
-            'repository': 'twilight',
-          }
+    try {
+      await _dio.post(
+        TwitchConstants.gqlUrl,
+        data: {
+          'query': mutation,
+          'variables': {
+            'input': {
+              'data': b64,
+              'encoding': 'GZIP_B64',
+              'repository': 'twilight',
+            }
+          },
         },
-      },
-      options: Options(headers: _headers),
-    );
+        options: Options(headers: _headers),
+      );
+      _log.log('minute-watched sent for $channelLogin', tag: 'GqlService');
+    } on DioException catch (e) {
+      _log.log(
+        'sendMinuteWatched failed for $channelLogin: '
+        '${e.response?.statusCode} ${e.response?.data ?? e.message}',
+        tag: 'GqlService',
+      );
+    }
   }
 
   // Fetches full drop details (including timeBasedDrops + self progress)
@@ -150,12 +179,17 @@ class GqlService {
         options: Options(headers: _headers),
       );
       final user = (res.data as Map<String, dynamic>)['data']?['currentUser'];
-      if (user == null) return null;
+      if (user == null) {
+        _log.log('fetchCurrentUser: currentUser is null (bad/expired token)',
+            tag: 'GqlService');
+        return null;
+      }
       return {
         'id': user['id']?.toString() ?? '',
         'login': user['login']?.toString() ?? '',
       };
-    } catch (_) {
+    } catch (e) {
+      _log.log('fetchCurrentUser failed: $e', tag: 'GqlService');
       return null;
     }
   }

@@ -1,9 +1,10 @@
-import 'dart:developer' as dev;
 import '../models/drop_campaign.dart';
 import 'gql_service.dart';
+import 'log_service.dart';
 
 class CampaignService {
   final GqlService gql;
+  final _log = LogService();
   CampaignService(this.gql);
 
   Future<List<DropCampaign>> fetchCampaigns() async {
@@ -18,16 +19,18 @@ class CampaignService {
           '5a4da2ab3d5b47c9f9ce864e727b2cb346af1e3ea8b897fe8f704a97ff017619',
     );
 
-    dev.log('ViewerDropsDashboard raw: $res', name: 'CampaignService');
+    _log.log('ViewerDropsDashboard raw: $res', tag: 'CampaignService');
 
     if (res['errors'] != null) {
-      dev.log('GQL errors: ${res['errors']}', name: 'CampaignService');
+      _log.log('GQL errors: ${res['errors']}', tag: 'CampaignService');
     }
 
     final user = res['data']?['currentUser'];
     if (user == null) {
-      dev.log('currentUser is null — token invalid OR wrong persisted query hash',
-          name: 'CampaignService');
+      _log.log(
+        'currentUser is null — token invalid OR wrong persisted query hash',
+        tag: 'CampaignService',
+      );
       return [];
     }
 
@@ -37,7 +40,8 @@ class CampaignService {
         (user['inventory']?['dropCampaignsInProgress'] as List?) ??
         [];
 
-    dev.log('Found ${rawList.length} raw campaigns (summary)', name: 'CampaignService');
+    _log.log('Found ${rawList.length} raw campaigns (summary)',
+        tag: 'CampaignService');
 
     // Keep only campaigns that are ACTIVE or UPCOMING at the summary level,
     // same filter TDM applies before bothering to fetch full details.
@@ -46,7 +50,8 @@ class CampaignService {
       return status == null || status == 'ACTIVE' || status == 'UPCOMING';
     }).toList();
 
-    dev.log('${candidates.length} candidates after status pre-filter', name: 'CampaignService');
+    _log.log('${candidates.length} candidates after status pre-filter',
+        tag: 'CampaignService');
 
     // Step 2: fetch full details (timeBasedDrops + self progress) per
     // campaign. ViewerDropsDashboard alone never has this data.
@@ -61,35 +66,39 @@ class CampaignService {
         );
         final campaignJson = detailRes['data']?['user']?['dropCampaign'];
         if (campaignJson == null) {
-          dev.log('No details for campaign $id, falling back to summary',
-              name: 'CampaignService');
+          _log.log('No details for campaign $id, falling back to summary',
+              tag: 'CampaignService');
           campaigns.add(DropCampaign.fromJson(c));
           continue;
         }
-        campaigns.add(DropCampaign.fromJson(campaignJson as Map<String, dynamic>));
+        campaigns
+            .add(DropCampaign.fromJson(campaignJson as Map<String, dynamic>));
       } catch (e) {
-        dev.log('fetchCampaignDetails failed for $id: $e', name: 'CampaignService');
+        _log.log('fetchCampaignDetails failed for $id: $e',
+            tag: 'CampaignService');
         campaigns.add(DropCampaign.fromJson(c));
       }
     }
 
     for (final c in campaigns) {
-      dev.log(
+      _log.log(
         'Campaign: ${c.name} | game: ${c.gameName} | status: "${c.status}" '
         '| drops: ${c.drops.length} | endAt: ${c.endAt}',
-        name: 'CampaignService',
+        tag: 'CampaignService',
       );
     }
 
     final now = DateTime.now();
     final filtered = campaigns.where((c) {
-      final statusOk = c.status.isEmpty || c.status == 'ACTIVE' || c.status == 'UPCOMING';
+      final statusOk =
+          c.status.isEmpty || c.status == 'ACTIVE' || c.status == 'UPCOMING';
       final notExpired = c.endAt.isAfter(now);
       final hasUnclaimed = c.drops.isEmpty || c.drops.any((d) => !d.claimed);
       return statusOk && notExpired && hasUnclaimed;
     }).toList();
 
-    dev.log('After filter: ${filtered.length} campaigns', name: 'CampaignService');
+    _log.log('After filter: ${filtered.length} campaigns',
+        tag: 'CampaignService');
     return filtered;
   }
 }

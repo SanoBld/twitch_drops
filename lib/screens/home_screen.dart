@@ -8,6 +8,7 @@ import '../services/mining_service.dart';
 import '../widgets/campaign_card.dart';
 import '../widgets/update_dialog.dart';
 import 'settings_screen.dart';
+import 'debug_screen.dart';
 import '../main.dart' show trayService;
 
 class HomeScreen extends StatefulWidget {
@@ -119,6 +120,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   navIndex: _navIndex,
                   loading: _loading,
                   onRefresh: _refresh,
+                  onOpenDebug: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const DebugScreen()),
+                    );
+                  },
                 ),
 
                 // Mining banner (only on Drops tab)
@@ -183,11 +189,13 @@ class _TopBar extends StatelessWidget {
   final int navIndex;
   final bool loading;
   final VoidCallback onRefresh;
+  final VoidCallback onOpenDebug;
 
   const _TopBar({
     required this.navIndex,
     required this.loading,
     required this.onRefresh,
+    required this.onOpenDebug,
   });
 
   @override
@@ -203,6 +211,11 @@ class _TopBar extends StatelessWidget {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const Spacer(),
+          IconButton(
+            tooltip: 'Debug logs',
+            icon: const Icon(Icons.bug_report_outlined),
+            onPressed: onOpenDebug,
+          ),
           if (navIndex == 0)
             loading
                 ? const SizedBox(
