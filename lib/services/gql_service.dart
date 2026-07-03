@@ -12,8 +12,15 @@ class GqlService {
 
   GqlService(this.auth);
 
+  // IMPORTANT: use the Android app's Client-Id (deviceClientId), not the
+  // web Client-Id, for GQL calls. Twitch's anti-bot "integrity" system
+  // blocks sensitive fields (like dropCampaigns) for the web client unless
+  // a Kasada challenge token is supplied. The Android client is currently
+  // NOT subject to that check, which is the same workaround DevilXD's
+  // TwitchDropsMiner uses (see: "Workaround the entirety of the integrity
+  // system by using an unprotected Android app Client ID").
   Map<String, String> get _headers => {
-        'Client-Id': TwitchConstants.clientId,
+        'Client-Id': TwitchConstants.deviceClientId,
         'Authorization': 'OAuth ${auth.token}',
         'Content-Type': 'application/json',
         'User-Agent': TwitchConstants.userAgent,
