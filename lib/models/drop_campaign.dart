@@ -12,6 +12,7 @@ class DropCampaign {
   // no matter how long you mine it — Twitch silently ignores progress
   // for unlinked accounts.
   final bool isAccountConnected;
+  final String boxArtUrl;
 
   DropCampaign({
     required this.id,
@@ -23,6 +24,7 @@ class DropCampaign {
     required this.endAt,
     required this.drops,
     this.isAccountConnected = true,
+    this.boxArtUrl = '',
   });
 
   bool get isActive => status.isEmpty || status == 'ACTIVE';
@@ -65,6 +67,7 @@ class DropCampaign {
       // Default to true when unknown, so we don't accidentally hide a
       // campaign just because this specific field was missing.
       isAccountConnected: self?['isAccountConnected'] as bool? ?? true,
+      boxArtUrl: game?['boxArtURL']?.toString() ?? '',
     );
   }
 

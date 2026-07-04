@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import '../models/drop_campaign.dart';
 import '../models/channel.dart';
 import '../services/auth_service.dart';
@@ -7,9 +8,27 @@ import '../services/campaign_service.dart';
 import '../services/mining_service.dart';
 import '../widgets/campaign_card.dart';
 import '../widgets/update_dialog.dart';
+import '../app_strings.dart';
 import 'settings_screen.dart';
+import 'filters_screen.dart';
 import 'debug_screen.dart';
 import '../main.dart' show trayService;
+
+// Desktop feel: enable smooth mouse-wheel + trackpad scrolling with a light
+// bounce, instead of the default abrupt/clamped desktop scroll physics.
+class _DesktopScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.touch,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      };
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+}
 
 class HomeScreen extends StatefulWidget {
   final AuthService auth;
@@ -100,87 +119,96 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Row(
-        children: [
-          // ── Navigation Rail ──────────────────────────────────────
-          NavigationRail(
-            selectedIndex: _navIndex,
-            onDestinationSelected: (i) => setState(() => _navIndex = i),
-            labelType: NavigationRailLabelType.all,
-            leading: Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 16),
-              child: _AppLogo(),
-            ),
-            destinations: const [
-              NavigationRailDestination(
-                icon: Icon(Icons.bolt_outlined),
-                selectedIcon: Icon(Icons.bolt),
-                label: Text('Drops'),
+    return ScrollConfiguration(
+      behavior: _DesktopScrollBehavior(),
+      child: Scaffold(
+        body: Row(
+          children: [
+            // ── Navigation Rail (compact, desktop-style) ────────────
+            NavigationRail(
+              selectedIndex: _navIndex,
+              onDestinationSelected: (i) => setState(() => _navIndex = i),
+              labelType: NavigationRailLabelType.all,
+              minWidth: 64,
+              leading: Padding(
+                padding: const EdgeInsets.only(top: 10, bottom: 12),
+                child: _AppLogo(),
               ),
-              NavigationRailDestination(
-                icon: Icon(Icons.settings_outlined),
-                selectedIcon: Icon(Icons.settings),
-                label: Text('Settings'),
-              ),
-            ],
-          ),
-          const VerticalDivider(width: 1),
-
-          // ── Main content ─────────────────────────────────────────
-          Expanded(
-            child: Column(
-              children: [
-                // Top bar
-                _TopBar(
-                  navIndex: _navIndex,
-                  loading: _loading,
-                  onRefresh: _refresh,
-                  onOpenDebug: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const DebugScreen()),
-                    );
-                  },
+              destinations: [
+                NavigationRailDestination(
+                  icon: const Icon(Icons.bolt_outlined),
+                  selectedIcon: const Icon(Icons.bolt),
+                  label: Text(tr('nav_drops')),
                 ),
-
-                // Mining control bar (only on Drops tab)
-                if (_navIndex == 0)
-                  _MiningControlBar(
-                    autoMining: _autoMining,
-                    linkedOnly: _linkedOnly,
-                    activeChannel: _activeChannel,
-                    onAutoMiningChanged: _toggleAutoMining,
-                    onLinkedOnlyChanged: (v) => setState(() => _linkedOnly = v),
-                  ),
-
-                // Page content
-                Expanded(
-                  child: IndexedStack(
-                    index: _navIndex,
-                    children: [
-                      _DropsTab(
-                        campaigns: _visibleCampaigns,
-                        loading: _loading,
-                        error: _error,
-                        activeChannel: _activeChannel,
-                        onRefresh: _refresh,
-                        onMineCampaign: _mineCampaign,
-                      ),
-                      SettingsScreen(
-                        auth: widget.auth,
-                        campaigns: _campaigns,
-                        onDisconnect: () {
-                          _miningService.stop();
-                          widget.onLogout();
-                        },
-                      ),
-                    ],
-                  ),
+                const NavigationRailDestination(
+                  icon: Icon(Icons.tune_outlined),
+                  selectedIcon: Icon(Icons.tune),
+                  label: Text('Filtres'),
+                ),
+                NavigationRailDestination(
+                  icon: const Icon(Icons.settings_outlined),
+                  selectedIcon: const Icon(Icons.settings),
+                  label: Text(tr('nav_settings')),
                 ),
               ],
             ),
-          ),
-        ],
+            const VerticalDivider(width: 1),
+
+            // ── Main content ─────────────────────────────────────────
+            Expanded(
+              child: Column(
+                children: [
+                  _TopBar(
+                    navIndex: _navIndex,
+                    loading: _loading,
+                    onRefresh: _refresh,
+                    onOpenDebug: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const DebugScreen()),
+                      );
+                    },
+                  ),
+
+                  if (_navIndex == 0)
+                    _MiningControlBar(
+                      autoMining: _autoMining,
+                      linkedOnly: _linkedOnly,
+                      activeChannel: _activeChannel,
+                      onAutoMiningChanged: _toggleAutoMining,
+                      onLinkedOnlyChanged: (v) =>
+                          setState(() => _linkedOnly = v),
+                    ),
+
+                  Expanded(
+                    child: IndexedStack(
+                      index: _navIndex,
+                      children: [
+                        _DropsTab(
+                          campaigns: _visibleCampaigns,
+                          loading: _loading,
+                          error: _error,
+                          activeChannel: _activeChannel,
+                          onRefresh: _refresh,
+                          onMineCampaign: _mineCampaign,
+                        ),
+                        FiltersScreen(campaigns: _campaigns),
+                        SettingsScreen(
+                          auth: widget.auth,
+                          campaigns: _campaigns,
+                          onDisconnect: () {
+                            _miningService.stop();
+                            widget.onLogout();
+                          },
+                          onLanguageChanged: () => setState(() {}),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -193,14 +221,14 @@ class _AppLogo extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      width: 40,
-      height: 40,
+      width: 34,
+      height: 34,
       decoration: BoxDecoration(
         color: cs.primaryContainer,
         shape: BoxShape.circle,
       ),
       child: Center(
-        child: Icon(Icons.bolt, color: cs.onPrimaryContainer, size: 22),
+        child: Icon(Icons.bolt, color: cs.onPrimaryContainer, size: 18),
       ),
     );
   }
@@ -223,31 +251,49 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const titles = ['Drop campaigns', 'Settings'];
+    final titles = [
+      tr('title_drop_campaigns'),
+      tr('title_filters'),
+      tr('title_settings'),
+    ];
     return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4)),
+        ),
+      ),
       child: Row(
         children: [
           Text(
             titles[navIndex],
-            style: Theme.of(context).textTheme.titleLarge,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
           ),
           const Spacer(),
           IconButton(
-            tooltip: 'Debug logs',
+            iconSize: 18,
+            tooltip: tr('debug_logs'),
             icon: const Icon(Icons.bug_report_outlined),
             onPressed: onOpenDebug,
           ),
           if (navIndex == 0)
             loading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                ? const Padding(
+                    padding: EdgeInsets.all(10),
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
                   )
                 : IconButton(
-                    tooltip: 'Refresh campaigns',
+                    iconSize: 18,
+                    tooltip: tr('refresh_campaigns'),
                     icon: const Icon(Icons.refresh_outlined),
                     onPressed: onRefresh,
                   ),
@@ -280,56 +326,48 @@ class _MiningControlBar extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(12),
+        border: Border(
+          bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              // Auto-mining toggle
-              Icon(
-                autoMining ? Icons.auto_mode : Icons.touch_app_outlined,
-                size: 18,
-                color: cs.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                autoMining ? 'Auto-mining' : 'Manual mining',
-                style: tt.labelLarge,
-              ),
-              const SizedBox(width: 8),
-              Switch(
-                value: autoMining,
-                onChanged: onAutoMiningChanged,
-              ),
-              const Spacer(),
-              // Linked-only filter
-              FilterChip(
-                label: const Text('Linked only'),
-                selected: linkedOnly,
-                onSelected: onLinkedOnlyChanged,
-                avatar: Icon(
-                  linkedOnly ? Icons.link : Icons.link_off,
-                  size: 16,
-                ),
-              ),
-            ],
+          Icon(
+            autoMining ? Icons.auto_mode : Icons.touch_app_outlined,
+            size: 15,
+            color: cs.primary,
           ),
-          if (!autoMining)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
+          const SizedBox(width: 6),
+          Text(
+            autoMining ? tr('auto_mining') : tr('manual_mining'),
+            style: tt.labelMedium,
+          ),
+          Transform.scale(
+            scale: 0.8,
+            child: Switch(value: autoMining, onChanged: onAutoMiningChanged),
+          ),
+          if (activeChannel != null) ...[
+            const SizedBox(width: 4),
+            Icon(Icons.circle, size: 7, color: cs.primary),
+            const SizedBox(width: 4),
+            Flexible(
               child: Text(
-                activeChannel != null
-                    ? 'Tap a campaign below to switch what you mine.'
-                    : 'Tap a campaign below to start mining it.',
-                style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                activeChannel!.displayName,
+                style: tt.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
+          ],
+          const Spacer(),
+          FilterChip(
+            visualDensity: VisualDensity.compact,
+            label: Text(tr('linked_only')),
+            selected: linkedOnly,
+            onSelected: onLinkedOnlyChanged,
+            avatar: Icon(linkedOnly ? Icons.link : Icons.link_off, size: 14),
+          ),
         ],
       ),
     );
@@ -371,18 +409,18 @@ class _DropsTab extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.cloud_off_outlined, size: 48, color: cs.error),
-              const SizedBox(height: 16),
-              Text('Failed to load campaigns', style: tt.titleMedium),
-              const SizedBox(height: 8),
+              Icon(Icons.cloud_off_outlined, size: 40, color: cs.error),
+              const SizedBox(height: 12),
+              Text(tr('failed_to_load'), style: tt.titleSmall),
+              const SizedBox(height: 6),
               Text(error!,
                   style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   textAlign: TextAlign.center),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: onRefresh,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
+                icon: const Icon(Icons.refresh, size: 16),
+                label: Text(tr('retry')),
               ),
             ],
           ),
@@ -397,21 +435,20 @@ class _DropsTab extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.inbox_outlined, size: 48, color: cs.onSurfaceVariant),
-              const SizedBox(height: 16),
-              Text('No campaigns to show', style: tt.titleMedium),
-              const SizedBox(height: 8),
+              Icon(Icons.inbox_outlined, size: 40, color: cs.onSurfaceVariant),
+              const SizedBox(height: 12),
+              Text(tr('no_campaigns_title'), style: tt.titleSmall),
+              const SizedBox(height: 6),
               Text(
-                'Try turning off "Linked only", or check the debug logs '
-                '(bug icon, top right) to see what Twitch returned.',
+                tr('no_campaigns_body'),
                 style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: onRefresh,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Check again'),
+                icon: const Icon(Icons.refresh, size: 16),
+                label: Text(tr('check_again')),
               ),
             ],
           ),
@@ -419,20 +456,24 @@ class _DropsTab extends StatelessWidget {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: campaigns.length,
-      itemBuilder: (_, i) {
-        final campaign = campaigns[i];
-        return InkWell(
-          onTap: () => onMineCampaign(campaign),
-          child: CampaignCard(
-            campaign: campaign,
-            isActivelymining:
-                activeChannel != null && campaign.gameId == activeChannel!.gameId,
-          ),
-        );
-      },
+    return Scrollbar(
+      thumbVisibility: true,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        itemCount: campaigns.length,
+        itemBuilder: (_, i) {
+          final campaign = campaigns[i];
+          return InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => onMineCampaign(campaign),
+            child: CampaignCard(
+              campaign: campaign,
+              isActivelymining: activeChannel != null &&
+                  campaign.gameId == activeChannel!.gameId,
+            ),
+          );
+        },
+      ),
     );
   }
 }

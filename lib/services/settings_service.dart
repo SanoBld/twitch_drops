@@ -1,9 +1,14 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
+enum SortMode { expiringSoonest, mostViewers, alphabetical }
+
 class SettingsService {
   static const _priorityKey = 'priority_games';
   static const _minimizeToTrayKey = 'minimize_to_tray';
+  static const _excludedGamesKey = 'excluded_games';
+  static const _sortModeKey = 'sort_mode';
+  static const _languageKey = 'app_language'; // 'en' | 'fr'
 
   Future<List<String>> loadPriority() async {
     final prefs = await SharedPreferences.getInstance();
@@ -25,5 +30,44 @@ class SettingsService {
   Future<void> setMinimizeToTray(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_minimizeToTrayKey, value);
+  }
+
+  // ── Excluded games (never auto-mined) ─────────────────────────────
+  Future<Set<String>> loadExcludedGames() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_excludedGamesKey);
+    if (raw == null) return {};
+    return Set<String>.from(jsonDecode(raw));
+  }
+
+  Future<void> saveExcludedGames(Set<String> gameIds) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_excludedGamesKey, jsonEncode(gameIds.toList()));
+  }
+
+  // ── Sort mode ──────────────────────────────────────────────────────
+  Future<SortMode> loadSortMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_sortModeKey);
+    return SortMode.values.firstWhere(
+      (m) => m.name == raw,
+      orElse: () => SortMode.expiringSoonest,
+    );
+  }
+
+  Future<void> saveSortMode(SortMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_sortModeKey, mode.name);
+  }
+
+  // ── Language ───────────────────────────────────────────────────────
+  Future<String> loadLanguage() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_languageKey) ?? 'fr';
+  }
+
+  Future<void> saveLanguage(String code) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_languageKey, code);
   }
 }

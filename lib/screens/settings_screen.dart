@@ -4,17 +4,20 @@ import '../models/drop_campaign.dart';
 import '../services/auth_service.dart';
 import '../services/autostart_service.dart';
 import '../services/settings_service.dart';
+import '../app_strings.dart';
 
 class SettingsScreen extends StatefulWidget {
   final AuthService auth;
   final List<DropCampaign> campaigns;
   final VoidCallback onDisconnect;
+  final VoidCallback? onLanguageChanged;
 
   const SettingsScreen({
     super.key,
     required this.auth,
     required this.campaigns,
     required this.onDisconnect,
+    this.onLanguageChanged,
   });
 
   @override
@@ -29,6 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _minimizeToTray = true;
   List<String> _priority = [];
   String _version = '';
+  String _language = 'fr';
   bool _loading = true;
 
   @override
@@ -43,19 +47,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _settings.getMinimizeToTray(),
       _settings.loadPriority(),
       PackageInfo.fromPlatform().then((i) => '${i.version}+${i.buildNumber}'),
+      _settings.loadLanguage(),
     ]);
     setState(() {
       _autostartEnabled = results[0] as bool;
       _minimizeToTray = results[1] as bool;
       _priority = results[2] as List<String>;
       _version = results[3] as String;
+      _language = results[4] as String;
       _loading = false;
     });
   }
 
-  Future<void> _savePriority(List<String> order) async {
-    await _settings.savePriority(order);
-    setState(() => _priority = order);
+  Future<void> _setLanguage(String code) async {
+    setState(() => _language = code);
+    await _settings.saveLanguage(code);
+    AppStrings.instance.locale = code == 'fr' ? AppLocale.fr : AppLocale.en;
+    widget.onLanguageChanged?.call();
   }
 
   String _gameName(String gameId) {
@@ -76,44 +84,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       children: [
+        // ── Language ─────────────────────────────────────────────────
+        _SectionHeader(title: tr('language')),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Icon(Icons.language, size: 18, color: cs.onSurfaceVariant),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: 'fr', label: Text('Français')),
+                      ButtonSegment(value: 'en', label: Text('English')),
+                    ],
+                    selected: {_language},
+                    onSelectionChanged: (s) => _setLanguage(s.first),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
         // ── Account ──────────────────────────────────────────────────
-        _SectionHeader(title: 'Account'),
+        _SectionHeader(title: tr('connected_account')),
         Card(
           child: Column(
             children: [
               ListTile(
                 leading: const Icon(Icons.account_circle_outlined),
-                title: const Text('Connected account'),
+                title: Text(tr('connected_account')),
                 subtitle: Text(
-                  widget.auth.token != null
-                      ? 'Token stored'
-                      : 'Not connected',
+                  widget.auth.token != null ? tr('token_stored') : tr('not_connected'),
                   style: tt.bodySmall,
                 ),
               ),
               const Divider(height: 1),
               ListTile(
                 leading: Icon(Icons.logout, color: cs.error),
-                title: Text('Disconnect',
-                    style: TextStyle(color: cs.error)),
-                subtitle: const Text('Remove stored credentials'),
+                title: Text(tr('disconnect'), style: TextStyle(color: cs.error)),
                 onTap: () async {
                   final ok = await showDialog<bool>(
                     context: context,
                     builder: (_) => AlertDialog(
-                      title: const Text('Disconnect?'),
-                      content: const Text(
-                          'This will remove your stored token. You will need to log in again.'),
+                      title: Text(tr('disconnect_confirm_title')),
+                      content: Text(tr('disconnect_confirm_body')),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
+                          child: Text(tr('cancel')),
                         ),
                         FilledButton(
-                          style: FilledButton.styleFrom(
-                              backgroundColor: cs.error),
+                          style: FilledButton.styleFrom(backgroundColor: cs.error),
                           onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Disconnect'),
+                          child: Text(tr('disconnect')),
                         ),
                       ],
                     ),
@@ -131,14 +159,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 20),
 
         // ── Behavior ─────────────────────────────────────────────────
-        _SectionHeader(title: 'Behavior'),
+        _SectionHeader(title: tr('behavior')),
         Card(
           child: Column(
             children: [
               SwitchListTile(
                 secondary: const Icon(Icons.rocket_launch_outlined),
-                title: const Text('Start with system'),
-                subtitle: const Text('Launch automatically at login'),
+                title: Text(tr('start_with_system')),
+                subtitle: Text(tr('start_with_system_sub')),
                 value: _autostartEnabled,
                 onChanged: (v) async {
                   if (v) {
@@ -152,9 +180,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const Divider(height: 1),
               SwitchListTile(
                 secondary: const Icon(Icons.minimize_outlined),
-                title: const Text('Minimize to tray on close'),
-                subtitle:
-                    const Text('Keep mining in background when window is closed'),
+                title: Text(tr('minimize_to_tray')),
+                subtitle: Text(tr('minimize_to_tray_sub')),
                 value: _minimizeToTray,
                 onChanged: (v) async {
                   await _settings.setMinimizeToTray(v);
@@ -167,46 +194,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
         const SizedBox(height: 20),
 
-        // ── Game priority ─────────────────────────────────────────────
-        _SectionHeader(title: 'Game priority'),
-        Card(
-          child: _priority.isEmpty
-              ? const ListTile(
-                  leading: Icon(Icons.info_outline),
-                  title: Text('No active campaigns'),
-                  subtitle: Text(
-                      'Priority list will appear once campaigns are loaded'),
-                )
-              : ReorderableListView(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  onReorder: (oldIndex, newIndex) {
-                    final newOrder = List<String>.from(_priority);
-                    if (newIndex > oldIndex) newIndex--;
-                    final item = newOrder.removeAt(oldIndex);
-                    newOrder.insert(newIndex, item);
-                    _savePriority(newOrder);
-                  },
-                  children: [
-                    for (var i = 0; i < _priority.length; i++)
-                      ListTile(
-                        key: ValueKey(_priority[i]),
-                        leading: CircleAvatar(
-                          radius: 14,
-                          child: Text('${i + 1}',
-                              style: const TextStyle(fontSize: 12)),
-                        ),
-                        title: Text(_gameName(_priority[i])),
-                        trailing: const Icon(Icons.drag_handle),
-                      ),
-                  ],
-                ),
-        ),
-
-        const SizedBox(height: 20),
-
         // ── About ─────────────────────────────────────────────────────
-        _SectionHeader(title: 'About'),
+        _SectionHeader(title: tr('about')),
         Card(
           child: Column(
             children: [
@@ -218,12 +207,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const Divider(height: 1),
               ListTile(
                 leading: const Icon(Icons.code_outlined),
-                title: const Text('Source code'),
+                title: Text(tr('source_code')),
                 subtitle: const Text('github.com/SanoBld/twitch_drops'),
                 trailing: const Icon(Icons.open_in_new, size: 16),
-                onTap: () {
-                  // url_launcher already in pubspec
-                },
+                onTap: () {},
               ),
             ],
           ),

@@ -118,22 +118,22 @@ class MiningService {
   Future<void> _pickBestChannel() async {
     if (!autoMiningEnabled) return;
     final priority = await _settings.loadPriority();
+    final excluded = await _settings.loadExcludedGames();
+    final sortMode = await _settings.loadSortMode();
 
-    // Only consider campaigns that are:
-    // - linked (isAccountConnected) — otherwise progress is never counted
-    // - have a usable game slug to search channels with
-    // - either have no drop data (couldn't be fetched, so we can't know —
-    //   assume mineable) OR have at least one unclaimed drop
     final eligible = _campaigns.where((c) =>
         c.isAccountConnected &&
         c.gameSlug.isNotEmpty &&
+        !excluded.contains(c.gameId) &&
         (c.drops.isEmpty || c.drops.any((d) => !d.claimed)));
 
     if (eligible.isEmpty) {
       _log.log(
         'No eligible campaigns to mine (need: account linked + '
-        'unclaimed drop + valid game). ${_campaigns.length} total campaigns, '
-        '${_campaigns.where((c) => c.isAccountConnected).length} linked.',
+        'unclaimed drop + valid game + not excluded). '
+        '${_campaigns.length} total campaigns, '
+        '${_campaigns.where((c) => c.isAccountConnected).length} linked, '
+        '${excluded.length} excluded.',
         tag: 'MiningService',
       );
       return;
@@ -141,12 +141,60 @@ class MiningService {
 
     final ordered = eligible.toList()
       ..sort((a, b) {
+        // Manual priority list always wins when both games are ranked in it.
         final ai = priority.indexOf(a.gameId);
         final bi = priority.indexOf(b.gameId);
-        final aRank = ai == -1 ? priority.length : ai;
-        final bRank = bi == -1 ? priority.length : bi;
-        return aRank.compareTo(bRank);
+        if (ai != -1 || bi != -1) {
+          final aRank = ai == -1 ? priority.length : ai;
+          final bRank = bi == -1 ? priority.length : bi;
+          if (aRank != bRank) return aRank.compareTo(bRank);
+        }
+        // Otherwise fall back to the chosen sort mode.
+        switch (sortMode) {
+          case SortMode.expiringSoonest:
+            return a.endAt.compareTo(b.endAt);
+          case SortMode.mostViewers:
+            return 0; // resolved after fetching live viewer counts below
+          case SortMode.alphabetical:
+            return a.gameName.toLowerCase().compareTo(b.gameName.toLowerCase());
+        }
       });
+
+    if (sortMode == SortMode.mostViewers) {
+      Channel? best;
+      DropCampaign? bestCampaign;
+      for (final campaign in ordered) {
+        List<Channel> channels;
+        try {
+          channels = await _channelService.fetchLiveChannels(
+            campaign.gameSlug, campaign.gameId, campaign.gameName);
+        } catch (_) {
+          continue;
+        }
+        if (channels.isEmpty) continue;
+        channels.sort((a, b) => b.viewers.compareTo(a.viewers));
+        if (best == null || channels.first.viewers > best.viewers) {
+          best = channels.first;
+          bestCampaign = campaign;
+        }
+      }
+      if (best == null || bestCampaign == null) {
+        _log.log('No live channels found across any eligible campaign',
+            tag: 'MiningService');
+        return;
+      }
+      if (activeChannel?.broadcastId != best.broadcastId) {
+        activeChannel = best;
+        _log.log(
+          'Now mining "${bestCampaign.gameName}" on channel '
+          '${best.displayName} (${best.viewers} viewers) — most-viewers mode',
+          tag: 'MiningService',
+        );
+        _statusController.add(activeChannel);
+        _ping();
+      }
+      return;
+    }
 
     for (final campaign in ordered) {
       List<Channel> channels;
