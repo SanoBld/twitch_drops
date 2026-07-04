@@ -30,7 +30,8 @@ class DropCampaign {
   factory DropCampaign.fromJson(Map<String, dynamic> j) {
     // Drops can be under 'timeBasedDrops' or 'drops' depending on API version
     final rawDrops = (j['timeBasedDrops'] ?? j['drops'] ?? []) as List;
-    final game = j['game'] as Map<String, dynamic>?;
+    final rawGame = j['game'];
+    final game = rawGame == null ? null : Map<String, dynamic>.from(rawGame as Map);
 
     // Twitch's ViewerDropsDashboard/DropCampaignDetails responses expose
     // the game name as 'displayName', not 'name'. Fall back to 'name' /
@@ -46,7 +47,8 @@ class DropCampaign {
         ? rawSlug
         : _slugify(gameName as String);
 
-    final self = j['self'] as Map<String, dynamic>?;
+    final rawSelf = j['self'];
+    final self = rawSelf == null ? null : Map<String, dynamic>.from(rawSelf as Map);
 
     return DropCampaign(
       id: j['id'] ?? '',
@@ -57,7 +59,9 @@ class DropCampaign {
       status: j['status'] ?? '',
       endAt: DateTime.tryParse(j['endAt'] ?? '') ??
           DateTime.now().add(const Duration(days: 30)),
-      drops: rawDrops.map((d) => TimeBasedDrop.fromJson(d)).toList(),
+      drops: rawDrops
+          .map((d) => TimeBasedDrop.fromJson(Map<String, dynamic>.from(d as Map)))
+          .toList(),
       // Default to true when unknown, so we don't accidentally hide a
       // campaign just because this specific field was missing.
       isAccountConnected: self?['isAccountConnected'] as bool? ?? true,
@@ -91,7 +95,8 @@ class TimeBasedDrop {
 
   factory TimeBasedDrop.fromJson(Map<String, dynamic> j) {
     // Progress lives under 'self' object
-    final self = (j['self'] ?? j['userDropInventory'] ?? {}) as Map<String, dynamic>;
+    final rawSelf = j['self'] ?? j['userDropInventory'];
+    final self = rawSelf == null ? <String, dynamic>{} : Map<String, dynamic>.from(rawSelf as Map);
     return TimeBasedDrop(
       id: j['id'] ?? '',
       name: j['name'] ?? '',

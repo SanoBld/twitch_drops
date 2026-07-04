@@ -21,6 +21,12 @@ class MiningService {
   String _userId = '';
   String _userLogin = '';
 
+  // When true (default), the service picks the best campaign/channel on
+  // its own. When false, it only mines whatever was set manually via
+  // mineCampaign(), and never auto-switches.
+  bool autoMiningEnabled = true;
+  DropCampaign? _manualCampaign;
+
   final _statusController = StreamController<Channel?>.broadcast();
   Stream<Channel?> get onChannelChanged => _statusController.stream;
 
@@ -54,17 +60,74 @@ class MiningService {
     );
   }
 
+  // Toggles automatic campaign/channel selection. Turning it off keeps
+  // mining whatever is currently active (or nothing) until the person
+  // manually picks a campaign via mineCampaign().
+  void setAutoMining(bool enabled) {
+    autoMiningEnabled = enabled;
+    _log.log('Auto-mining ${enabled ? "enabled" : "disabled"}',
+        tag: 'MiningService');
+    if (enabled) {
+      _manualCampaign = null;
+      _pickBestChannel();
+    }
+  }
+
+  // Manually mine a specific campaign, bypassing priority/auto-selection.
+  // Stays on it until the person picks another one or re-enables auto mode.
+  Future<void> mineCampaign(DropCampaign campaign) async {
+    autoMiningEnabled = false;
+    _manualCampaign = campaign;
+    _log.log('Manually selected campaign: ${campaign.name} (${campaign.gameName})',
+        tag: 'MiningService');
+
+    if (campaign.gameSlug.isEmpty) {
+      _log.log('Campaign has no usable game slug, cannot find a channel',
+          tag: 'MiningService');
+      return;
+    }
+
+    try {
+      final channels = await _channelService.fetchLiveChannels(
+        campaign.gameSlug,
+        campaign.gameId,
+        campaign.gameName,
+      );
+      if (channels.isEmpty) {
+        _log.log('No live channels found for "${campaign.gameName}"',
+            tag: 'MiningService');
+        activeChannel = null;
+        _statusController.add(null);
+        return;
+      }
+      channels.sort((a, b) => b.viewers.compareTo(a.viewers));
+      activeChannel = channels.first;
+      _log.log(
+        'Now mining "${campaign.gameName}" on channel '
+        '${activeChannel!.displayName} (${activeChannel!.viewers} viewers)',
+        tag: 'MiningService',
+      );
+      _statusController.add(activeChannel);
+      _ping();
+    } catch (e) {
+      _log.log('mineCampaign failed for "${campaign.gameName}": $e',
+          tag: 'MiningService');
+    }
+  }
+
   Future<void> _pickBestChannel() async {
+    if (!autoMiningEnabled) return;
     final priority = await _settings.loadPriority();
 
     // Only consider campaigns that are:
     // - linked (isAccountConnected) — otherwise progress is never counted
-    // - have at least one unclaimed drop
-    // - actually have a usable game slug to search channels with
+    // - have a usable game slug to search channels with
+    // - either have no drop data (couldn't be fetched, so we can't know —
+    //   assume mineable) OR have at least one unclaimed drop
     final eligible = _campaigns.where((c) =>
         c.isAccountConnected &&
-        c.drops.any((d) => !d.claimed) &&
-        c.gameSlug.isNotEmpty);
+        c.gameSlug.isNotEmpty &&
+        (c.drops.isEmpty || c.drops.any((d) => !d.claimed)));
 
     if (eligible.isEmpty) {
       _log.log(

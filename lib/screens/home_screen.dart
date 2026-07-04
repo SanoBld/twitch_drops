@@ -31,6 +31,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Channel? _activeChannel;
   bool _loading = true;
   String? _error;
+  bool _autoMining = true;
+  bool _linkedOnly = true;
 
   @override
   void initState() {
@@ -82,6 +84,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _toggleAutoMining(bool value) {
+    setState(() => _autoMining = value);
+    _miningService.setAutoMining(value);
+  }
+
+  void _mineCampaign(DropCampaign campaign) {
+    setState(() => _autoMining = false);
+    _miningService.mineCampaign(campaign);
+  }
+
+  List<DropCampaign> get _visibleCampaigns => _linkedOnly
+      ? _campaigns.where((c) => c.isAccountConnected).toList()
+      : _campaigns;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -127,9 +143,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
 
-                // Mining banner (only on Drops tab)
-                if (_navIndex == 0 && _activeChannel != null)
-                  _MiningBanner(channel: _activeChannel!),
+                // Mining control bar (only on Drops tab)
+                if (_navIndex == 0)
+                  _MiningControlBar(
+                    autoMining: _autoMining,
+                    linkedOnly: _linkedOnly,
+                    activeChannel: _activeChannel,
+                    onAutoMiningChanged: _toggleAutoMining,
+                    onLinkedOnlyChanged: (v) => setState(() => _linkedOnly = v),
+                  ),
 
                 // Page content
                 Expanded(
@@ -137,11 +159,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     index: _navIndex,
                     children: [
                       _DropsTab(
-                        campaigns: _campaigns,
+                        campaigns: _visibleCampaigns,
                         loading: _loading,
                         error: _error,
                         activeChannel: _activeChannel,
                         onRefresh: _refresh,
+                        onMineCampaign: _mineCampaign,
                       ),
                       SettingsScreen(
                         auth: widget.auth,
@@ -234,11 +257,22 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-// ── Mining banner ────────────────────────────────────────────────────────────
+// ── Mining control bar ───────────────────────────────────────────────────────
 
-class _MiningBanner extends StatelessWidget {
-  final Channel channel;
-  const _MiningBanner({required this.channel});
+class _MiningControlBar extends StatelessWidget {
+  final bool autoMining;
+  final bool linkedOnly;
+  final Channel? activeChannel;
+  final ValueChanged<bool> onAutoMiningChanged;
+  final ValueChanged<bool> onLinkedOnlyChanged;
+
+  const _MiningControlBar({
+    required this.autoMining,
+    required this.linkedOnly,
+    required this.activeChannel,
+    required this.onAutoMiningChanged,
+    required this.onLinkedOnlyChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -247,64 +281,58 @@ class _MiningBanner extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: cs.primaryContainer.withValues(alpha: 0.5),
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.primary.withValues(alpha: 0.3)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: cs.primary,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Icon(Icons.bolt, size: 18, color: cs.primary),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text.rich(
-              TextSpan(children: [
-                TextSpan(
-                    text: 'Mining ',
-                    style: tt.bodyMedium
-                        ?.copyWith(color: cs.onPrimaryContainer)),
-                TextSpan(
-                    text: channel.displayName,
-                    style: tt.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: cs.onPrimaryContainer)),
-                if (channel.gameName.isNotEmpty)
-                  TextSpan(
-                      text: ' · ${channel.gameName}',
-                      style: tt.bodySmall
-                          ?.copyWith(color: cs.onPrimaryContainer)),
-              ]),
-            ),
-          ),
-          if (channel.viewers > 0)
-            Row(children: [
-              Icon(Icons.people_outline,
-                  size: 14, color: cs.onPrimaryContainer),
-              const SizedBox(width: 4),
-              Text(
-                _formatViewers(channel.viewers),
-                style: tt.labelSmall
-                    ?.copyWith(color: cs.onPrimaryContainer),
+          Row(
+            children: [
+              // Auto-mining toggle
+              Icon(
+                autoMining ? Icons.auto_mode : Icons.touch_app_outlined,
+                size: 18,
+                color: cs.primary,
               ),
-            ]),
+              const SizedBox(width: 8),
+              Text(
+                autoMining ? 'Auto-mining' : 'Manual mining',
+                style: tt.labelLarge,
+              ),
+              const SizedBox(width: 8),
+              Switch(
+                value: autoMining,
+                onChanged: onAutoMiningChanged,
+              ),
+              const Spacer(),
+              // Linked-only filter
+              FilterChip(
+                label: const Text('Linked only'),
+                selected: linkedOnly,
+                onSelected: onLinkedOnlyChanged,
+                avatar: Icon(
+                  linkedOnly ? Icons.link : Icons.link_off,
+                  size: 16,
+                ),
+              ),
+            ],
+          ),
+          if (!autoMining)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                activeChannel != null
+                    ? 'Tap a campaign below to switch what you mine.'
+                    : 'Tap a campaign below to start mining it.',
+                style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ),
         ],
       ),
     );
-  }
-
-  String _formatViewers(int v) {
-    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}k';
-    return v.toString();
   }
 }
 
@@ -316,6 +344,7 @@ class _DropsTab extends StatelessWidget {
   final String? error;
   final Channel? activeChannel;
   final VoidCallback onRefresh;
+  final ValueChanged<DropCampaign> onMineCampaign;
 
   const _DropsTab({
     required this.campaigns,
@@ -323,6 +352,7 @@ class _DropsTab extends StatelessWidget {
     required this.error,
     required this.activeChannel,
     required this.onRefresh,
+    required this.onMineCampaign,
   });
 
   @override
@@ -343,12 +373,10 @@ class _DropsTab extends StatelessWidget {
             children: [
               Icon(Icons.cloud_off_outlined, size: 48, color: cs.error),
               const SizedBox(height: 16),
-              Text('Failed to load campaigns',
-                  style: tt.titleMedium),
+              Text('Failed to load campaigns', style: tt.titleMedium),
               const SizedBox(height: 8),
               Text(error!,
-                  style: tt.bodySmall
-                      ?.copyWith(color: cs.onSurfaceVariant),
+                  style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   textAlign: TextAlign.center),
               const SizedBox(height: 24),
               FilledButton.icon(
@@ -369,20 +397,14 @@ class _DropsTab extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.inbox_outlined, size: 48,
-                  color: cs.onSurfaceVariant),
+              Icon(Icons.inbox_outlined, size: 48, color: cs.onSurfaceVariant),
               const SizedBox(height: 16),
-              Text('No active drop campaigns',
-                  style: tt.titleMedium),
+              Text('No campaigns to show', style: tt.titleMedium),
               const SizedBox(height: 8),
               Text(
-                'Make sure:\n'
-                '\u2022 Your Twitch account is linked to game accounts on twitch.tv/drops/campaigns\n'
-                '\u2022 There are active drop campaigns for linked games\n'
-                '\u2022 The account has not already claimed all drops\n\n'
-                'Tap the bug icon (top right) to see the debug logs.',
-                style:
-                    tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                'Try turning off "Linked only", or check the debug logs '
+                '(bug icon, top right) to see what Twitch returned.',
+                style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -400,12 +422,17 @@ class _DropsTab extends StatelessWidget {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: campaigns.length,
-      itemBuilder: (_, i) => CampaignCard(
-        campaign: campaigns[i],
-        isActivelymining:
-            activeChannel != null &&
-            campaigns[i].gameId == activeChannel!.gameId,
-      ),
+      itemBuilder: (_, i) {
+        final campaign = campaigns[i];
+        return InkWell(
+          onTap: () => onMineCampaign(campaign),
+          child: CampaignCard(
+            campaign: campaign,
+            isActivelymining:
+                activeChannel != null && campaign.gameId == activeChannel!.gameId,
+          ),
+        );
+      },
     );
   }
 }
