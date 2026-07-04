@@ -64,6 +64,11 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) setState(() => _activeChannel = ch);
       trayService.updateMiningStatus(ch?.displayName);
     });
+    _miningService.onCampaignsUpdated.listen((_) {
+      // Real Twitch-confirmed progress came in — refresh the list so
+      // the progress bars on campaign cards reflect it immediately.
+      if (mounted) setState(() {});
+    });
     _refresh();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       showUpdateDialogIfNeeded(context);
@@ -107,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _toggleAutoMining(bool value) {
     setState(() => _autoMining = value);
     _miningService.setAutoMining(value);
+    trayService.setAutoMiningState(value);
   }
 
   void _mineCampaign(DropCampaign campaign) {

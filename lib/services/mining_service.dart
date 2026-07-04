@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import '../models/channel.dart';
 import '../models/drop_campaign.dart';
 import 'gql_service.dart';
 import 'channel_service.dart';
 import 'settings_service.dart';
 import 'log_service.dart';
+import 'socket_service.dart';
 
 // Mines drop campaigns by sending the Spade "minute-watched" GQL event once
 // per minute, without streaming video. Mirrors TDM's stream-less approach.
@@ -34,6 +36,13 @@ class MiningService {
   final _statusController = StreamController<Channel?>.broadcast();
   Stream<Channel?> get onChannelChanged => _statusController.stream;
 
+  // Fires whenever a drop's progress changes (from a real Twitch pubsub
+  // confirmation), so the UI can rebuild the campaign list to show it.
+  final _campaignsUpdatedController = StreamController<void>.broadcast();
+  Stream<void> get onCampaignsUpdated => _campaignsUpdatedController.stream;
+
+  TwitchSocketService? _socket;
+
   MiningService(this.gql) {
     _channelService = ChannelService(gql);
   }
@@ -50,6 +59,21 @@ class MiningService {
       }
     }
 
+    // Connect to Twitch's real-time drop-progress feed. This is the SAME
+    // mechanism the reference TwitchDropsMiner app uses — Twitch pushes
+    // authoritative "drop-progress" / "drop-claim" events here, so the
+    // progress shown in the app reflects what Twitch has actually
+    // registered, not a local guess.
+    if (_userId.isNotEmpty && _socket == null) {
+      _socket = TwitchSocketService(_handleSocketEvent);
+      _socket!.connect(
+        ['user-drop-events.$_userId'],
+        authToken: gql.auth.token,
+      );
+      _log.log('Connected to user-drop-events.$_userId for real progress updates',
+          tag: 'MiningService');
+    }
+
     await _pickBestChannel();
 
     _pingTimer?.cancel();
@@ -62,6 +86,62 @@ class MiningService {
       const Duration(minutes: 2),
       (_) => _pickBestChannel(),
     );
+  }
+
+  // Handles raw PubSub frames. Twitch wraps actual events as:
+  // { type: "MESSAGE", data: { topic: "...", message: "<json string>" } }
+  // where the inner "message" is itself JSON-encoded and needs decoding.
+  void _handleSocketEvent(Map<String, dynamic> frame) {
+    if (frame['type'] != 'MESSAGE') return;
+    final topic = frame['data']?['topic']?.toString() ?? '';
+    if (!topic.startsWith('user-drop-events')) return;
+
+    Map<String, dynamic> inner;
+    try {
+      inner = jsonDecode(frame['data']['message'] as String) as Map<String, dynamic>;
+    } catch (e) {
+      _log.log('Failed to parse drop-event message: $e', tag: 'MiningService');
+      return;
+    }
+
+    final eventType = inner['type']?.toString() ?? '';
+    final data = inner['data'] as Map<String, dynamic>?;
+    if (data == null) return;
+
+    if (eventType == 'drop-progress') {
+      final dropId = data['drop_id']?.toString();
+      final current = data['current_progress_min'] as int?;
+      final required = data['required_progress_min'] as int?;
+      if (dropId == null || current == null) return;
+      _log.log(
+        'Real progress update from Twitch: drop $dropId → $current'
+        '${required != null ? '/$required' : ''} min',
+        tag: 'MiningService',
+      );
+      _updateDropProgress(dropId, currentMinutes: current);
+    } else if (eventType == 'drop-claim') {
+      final dropId = data['drop_id']?.toString();
+      if (dropId == null) return;
+      _log.log('Drop $dropId is ready to claim (per Twitch)',
+          tag: 'MiningService');
+      _updateDropProgress(dropId, claimed: true);
+    }
+  }
+
+  void _updateDropProgress(String dropId, {int? currentMinutes, bool? claimed}) {
+    var changed = false;
+    for (final campaign in _campaigns) {
+      for (final drop in campaign.drops) {
+        if (drop.id == dropId) {
+          if (currentMinutes != null) drop.currentMinutes = currentMinutes;
+          if (claimed != null) drop.claimed = claimed;
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      _campaignsUpdatedController.add(null);
+    }
   }
 
   // Toggles automatic campaign/channel selection. Turning it off keeps
@@ -291,6 +371,8 @@ class MiningService {
   void stop() {
     _pingTimer?.cancel();
     _switchCheckTimer?.cancel();
+    _socket?.disconnect();
+    _socket = null;
     activeChannel = null;
     miningStartedAt = null;
     lastPingAt = null;
@@ -300,5 +382,6 @@ class MiningService {
   void dispose() {
     stop();
     _statusController.close();
+    _campaignsUpdatedController.close();
   }
 }

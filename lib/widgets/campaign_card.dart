@@ -42,9 +42,12 @@ class CampaignCard extends StatelessWidget {
                           width: 40,
                           height: 53,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _fallbackArt(cs),
-                          loadingBuilder: (context, child, progress) =>
-                              progress == null ? child : _fallbackArt(cs),
+                          errorBuilder: (_, error, ___) {
+                            // ignore: avoid_print
+                            print('[CampaignCard] Image failed to load '
+                                '(${campaign.boxArtUrl}): $error');
+                            return _fallbackArt(cs);
+                          },
                         )
                       : _fallbackArt(cs),
                 ),
@@ -163,7 +166,9 @@ class _DropRow extends StatelessWidget {
                 ])
               else
                 Text(
-                  '${drop.currentMinutes}m / ${drop.requiredMinutes}m',
+                  '${(drop.progress * 100).toStringAsFixed(0)}% · '
+                  '${drop.currentMinutes}/${drop.requiredMinutes}m · '
+                  '${drop.remainingMinutes}m restantes',
                   style: tt.labelSmall
                       ?.copyWith(color: cs.onSurfaceVariant),
                 ),
