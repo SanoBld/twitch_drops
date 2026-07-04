@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import '../models/drop_campaign.dart';
@@ -171,6 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   if (_navIndex == 0)
                     _MiningControlBar(
+                      miningService: _miningService,
                       autoMining: _autoMining,
                       linkedOnly: _linkedOnly,
                       activeChannel: _activeChannel,
@@ -305,7 +307,8 @@ class _TopBar extends StatelessWidget {
 
 // ── Mining control bar ───────────────────────────────────────────────────────
 
-class _MiningControlBar extends StatelessWidget {
+class _MiningControlBar extends StatefulWidget {
+  final MiningService miningService;
   final bool autoMining;
   final bool linkedOnly;
   final Channel? activeChannel;
@@ -313,6 +316,7 @@ class _MiningControlBar extends StatelessWidget {
   final ValueChanged<bool> onLinkedOnlyChanged;
 
   const _MiningControlBar({
+    required this.miningService,
     required this.autoMining,
     required this.linkedOnly,
     required this.activeChannel,
@@ -321,9 +325,47 @@ class _MiningControlBar extends StatelessWidget {
   });
 
   @override
+  State<_MiningControlBar> createState() => _MiningControlBarState();
+}
+
+class _MiningControlBarState extends State<_MiningControlBar> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    // Tick every second just to refresh the "since/next" text below.
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  String _fmtDuration(Duration d) {
+    final m = d.inMinutes;
+    final s = d.inSeconds % 60;
+    return '${m}m ${s.toString().padLeft(2, '0')}s';
+  }
+
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final ms = widget.miningService;
+
+    final now = DateTime.now();
+    final sessionDuration =
+        ms.miningStartedAt != null ? now.difference(ms.miningStartedAt!) : null;
+    final sinceLastPing =
+        ms.lastPingAt != null ? now.difference(ms.lastPingAt!) : null;
+    final nextPingIn = sinceLastPing != null
+        ? Duration(seconds: 60) - sinceLastPing
+        : null;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -332,42 +374,58 @@ class _MiningControlBar extends StatelessWidget {
           bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            autoMining ? Icons.auto_mode : Icons.touch_app_outlined,
-            size: 15,
-            color: cs.primary,
+          Row(
+            children: [
+              Icon(
+                widget.autoMining ? Icons.auto_mode : Icons.touch_app_outlined,
+                size: 15,
+                color: cs.primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                widget.autoMining ? tr('auto_mining') : tr('manual_mining'),
+                style: tt.labelMedium,
+              ),
+              Transform.scale(
+                scale: 0.8,
+                child: Switch(
+                    value: widget.autoMining, onChanged: widget.onAutoMiningChanged),
+              ),
+              if (widget.activeChannel != null) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.circle, size: 7, color: cs.primary),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    widget.activeChannel!.displayName,
+                    style: tt.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+              const Spacer(),
+              FilterChip(
+                visualDensity: VisualDensity.compact,
+                label: Text(tr('linked_only')),
+                selected: widget.linkedOnly,
+                onSelected: widget.onLinkedOnlyChanged,
+                avatar: Icon(widget.linkedOnly ? Icons.link : Icons.link_off, size: 14),
+              ),
+            ],
           ),
-          const SizedBox(width: 6),
-          Text(
-            autoMining ? tr('auto_mining') : tr('manual_mining'),
-            style: tt.labelMedium,
-          ),
-          Transform.scale(
-            scale: 0.8,
-            child: Switch(value: autoMining, onChanged: onAutoMiningChanged),
-          ),
-          if (activeChannel != null) ...[
-            const SizedBox(width: 4),
-            Icon(Icons.circle, size: 7, color: cs.primary),
-            const SizedBox(width: 4),
-            Flexible(
+          if (widget.activeChannel != null && sessionDuration != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, left: 21),
               child: Text(
-                activeChannel!.displayName,
-                style: tt.labelMedium?.copyWith(fontWeight: FontWeight.w600),
-                overflow: TextOverflow.ellipsis,
+                nextPingIn != null && !nextPingIn.isNegative
+                    ? 'Mining depuis ${_fmtDuration(sessionDuration)} · prochain envoi dans ${nextPingIn.inSeconds}s'
+                    : 'Mining depuis ${_fmtDuration(sessionDuration)} · envoi en cours…',
+                style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
               ),
             ),
-          ],
-          const Spacer(),
-          FilterChip(
-            visualDensity: VisualDensity.compact,
-            label: Text(tr('linked_only')),
-            selected: linkedOnly,
-            onSelected: onLinkedOnlyChanged,
-            avatar: Icon(linkedOnly ? Icons.link : Icons.link_off, size: 14),
-          ),
         ],
       ),
     );

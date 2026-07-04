@@ -27,6 +27,10 @@ class MiningService {
   bool autoMiningEnabled = true;
   DropCampaign? _manualCampaign;
 
+  // Exposed for the UI so it can show "mining since..." / "next update in...".
+  DateTime? miningStartedAt;
+  DateTime? lastPingAt;
+
   final _statusController = StreamController<Channel?>.broadcast();
   Stream<Channel?> get onChannelChanged => _statusController.stream;
 
@@ -76,6 +80,15 @@ class MiningService {
   // Manually mine a specific campaign, bypassing priority/auto-selection.
   // Stays on it until the person picks another one or re-enables auto mode.
   Future<void> mineCampaign(DropCampaign campaign) async {
+    // Don't restart the session if we're already mining this exact
+    // campaign — switching channels resets Twitch's per-stream watch
+    // timer, so re-selecting the same one should be a no-op.
+    if (_manualCampaign?.id == campaign.id && activeChannel != null) {
+      _log.log('Already mining "${campaign.name}", ignoring re-tap',
+          tag: 'MiningService');
+      return;
+    }
+
     autoMiningEnabled = false;
     _manualCampaign = campaign;
     _log.log('Manually selected campaign: ${campaign.name} (${campaign.gameName})',
@@ -101,7 +114,13 @@ class MiningService {
         return;
       }
       channels.sort((a, b) => b.viewers.compareTo(a.viewers));
-      activeChannel = channels.first;
+      final candidate = channels.first;
+      if (activeChannel?.broadcastId == candidate.broadcastId) {
+        // Same underlying stream — don't reset the session timer.
+        return;
+      }
+      activeChannel = candidate;
+      miningStartedAt = DateTime.now();
       _log.log(
         'Now mining "${campaign.gameName}" on channel '
         '${activeChannel!.displayName} (${activeChannel!.viewers} viewers)',
@@ -185,6 +204,7 @@ class MiningService {
       }
       if (activeChannel?.broadcastId != best.broadcastId) {
         activeChannel = best;
+        miningStartedAt = DateTime.now();
         _log.log(
           'Now mining "${bestCampaign.gameName}" on channel '
           '${best.displayName} (${best.viewers} viewers) — most-viewers mode',
@@ -228,6 +248,7 @@ class MiningService {
       if (activeChannel?.broadcastId == candidate.broadcastId) return;
 
       activeChannel = candidate;
+      miningStartedAt = DateTime.now();
       _log.log(
         'Now mining "${campaign.gameName}" on channel '
         '${candidate.displayName} (${candidate.viewers} viewers)',
@@ -260,6 +281,7 @@ class MiningService {
         userId: _userId,
         userLogin: _userLogin,
       );
+      lastPingAt = DateTime.now();
     } catch (e) {
       _log.log('Ping failed for ${ch.login}: $e', tag: 'MiningService');
       // Failed ping likely means channel went offline; re-pick next cycle.
@@ -270,6 +292,8 @@ class MiningService {
     _pingTimer?.cancel();
     _switchCheckTimer?.cancel();
     activeChannel = null;
+    miningStartedAt = null;
+    lastPingAt = null;
     _statusController.add(null);
   }
 

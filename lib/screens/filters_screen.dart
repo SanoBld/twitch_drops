@@ -13,6 +13,8 @@ class FiltersScreen extends StatefulWidget {
 
 class _FiltersScreenState extends State<FiltersScreen> {
   final _settings = SettingsService();
+  final _searchController = TextEditingController();
+  String _query = '';
 
   bool _loading = true;
   List<String> _priorityOrder = [];
@@ -29,6 +31,20 @@ class _FiltersScreenState extends State<FiltersScreen> {
       for (final c in widget.campaigns) c.gameId: c.gameName,
     };
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<MapEntry<String, String>> get _filteredGames {
+    final entries = _games.entries.toList()
+      ..sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
+    if (_query.isEmpty) return entries;
+    final q = _query.toLowerCase();
+    return entries.where((e) => e.value.toLowerCase().contains(q)).toList();
   }
 
   Future<void> _load() async {
@@ -155,26 +171,56 @@ class _FiltersScreenState extends State<FiltersScreen> {
                 ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 8),
-          Card(
-            child: Column(
-              children: [
-                for (final entry in _games.entries)
-                  CheckboxListTile(
-                    title: Text(entry.value),
-                    value: _excluded.contains(entry.key),
-                    onChanged: (checked) {
-                      setState(() {
-                        if (checked == true) {
-                          _excluded.add(entry.key);
-                        } else {
-                          _excluded.remove(entry.key);
-                        }
-                      });
-                      _saveExcluded();
-                    },
-                  ),
-              ],
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              isDense: true,
+              prefixIcon: const Icon(Icons.search, size: 18),
+              hintText: 'Rechercher un jeu…',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              suffixIcon: _query.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 16),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _query = '');
+                      },
+                    )
+                  : null,
             ),
+            onChanged: (v) => setState(() => _query = v),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: _filteredGames.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('Aucun jeu trouvé.'),
+                  )
+                : ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 360),
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final entry in _filteredGames)
+                          CheckboxListTile(
+                            dense: true,
+                            title: Text(entry.value),
+                            value: _excluded.contains(entry.key),
+                            onChanged: (checked) {
+                              setState(() {
+                                if (checked == true) {
+                                  _excluded.add(entry.key);
+                                } else {
+                                  _excluded.remove(entry.key);
+                                }
+                              });
+                              _saveExcluded();
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
           ),
           const SizedBox(height: 24),
         ],
