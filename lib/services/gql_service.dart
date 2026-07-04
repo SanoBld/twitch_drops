@@ -176,6 +176,30 @@ class GqlService {
     return res;
   }
 
+  // Claims a completed drop's reward. Called automatically as soon as a
+  // "drop-claim" event comes in over the user-drop-events websocket.
+  Future<bool> claimDropReward(String dropInstanceId) async {
+    try {
+      final res = await query(
+        'DropsPage_ClaimDropRewards',
+        {
+          'input': {'dropInstanceID': dropInstanceId}
+        },
+        sha256Hash:
+            '2f884fa187b8fadb2a49db0adc033e636f7b6aaee6e76de1e2bba9a7baf0daf6',
+      );
+      if (res['errors'] != null) {
+        _log.log('claimDropReward errors: ${res['errors']}', tag: 'GqlService');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      _log.log('claimDropReward failed for $dropInstanceId: $e',
+          tag: 'GqlService');
+      return false;
+    }
+  }
+
   // Fetches the logged-in user's ID and login from GQL.
   Future<Map<String, String>?> fetchCurrentUser() async {
     try {

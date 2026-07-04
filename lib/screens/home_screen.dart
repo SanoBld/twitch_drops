@@ -62,13 +62,24 @@ class _HomeScreenState extends State<HomeScreen> {
     _miningService = MiningService(_gql);
     _miningService.onChannelChanged.listen((ch) {
       if (mounted) setState(() => _activeChannel = ch);
-      trayService.updateMiningStatus(ch?.displayName);
+      _pushTrayStatus(ch);
     });
     _miningService.onCampaignsUpdated.listen((_) {
       // Real Twitch-confirmed progress came in — refresh the list so
       // the progress bars on campaign cards reflect it immediately.
       if (mounted) setState(() {});
+      _pushTrayStatus(_activeChannel);
     });
+
+    // Rewire the tray menu's action buttons to the real implementations —
+    // main.dart only has safe placeholder defaults since MiningService and
+    // CampaignService don't exist yet at that point in startup.
+    trayService.onStopMining = () {
+      _miningService.stop();
+      if (mounted) setState(() => _autoMining = false);
+    };
+    trayService.onToggleAutoMining = () => _toggleAutoMining(!_autoMining);
+    trayService.onRefreshNow = _refresh;
     _refresh();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       showUpdateDialogIfNeeded(context);
@@ -79,6 +90,29 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _miningService.dispose();
     super.dispose();
+  }
+
+  void _pushTrayStatus(Channel? ch) {
+    if (ch == null) {
+      trayService.updateMiningStatus(null);
+      return;
+    }
+    // Find the current unclaimed drop for the game being mined, to show
+    // its real progress in the tray tooltip/menu.
+    double? progress;
+    for (final c in _campaigns) {
+      if (c.gameId == ch.gameId) {
+        final drop = c.drops.where((d) => !d.claimed).cast<TimeBasedDrop?>().firstWhere(
+              (d) => d != null,
+              orElse: () => null,
+            );
+        if (drop != null) {
+          progress = drop.progress;
+          break;
+        }
+      }
+    }
+    trayService.updateMiningStatus(ch.displayName, gameName: ch.gameName, progress: progress);
   }
 
   Future<void> _refresh() async {

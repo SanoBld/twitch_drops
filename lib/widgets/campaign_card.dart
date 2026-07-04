@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/drop_campaign.dart';
+import '../services/game_image_service.dart';
 
-class CampaignCard extends StatelessWidget {
+class CampaignCard extends StatefulWidget {
   final DropCampaign campaign;
   final bool isActivelymining;
 
@@ -12,16 +13,34 @@ class CampaignCard extends StatelessWidget {
   });
 
   @override
+  State<CampaignCard> createState() => _CampaignCardState();
+}
+
+class _CampaignCardState extends State<CampaignCard> {
+  bool _twitchImageFailed = false;
+  String? _fallbackUrl;
+  bool _fallbackRequested = false;
+
+  void _requestFallback() {
+    if (_fallbackRequested) return;
+    _fallbackRequested = true;
+    GameImageService.instance.fetchFallbackImage(widget.campaign.gameName).then((url) {
+      if (mounted && url != null) setState(() => _fallbackUrl = url);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final campaign = widget.campaign;
     final daysLeft = campaign.endAt.difference(DateTime.now()).inDays;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: isActivelymining
+        side: widget.isActivelymining
             ? BorderSide(color: cs.primary, width: 1.5)
             : BorderSide.none,
       ),
@@ -33,23 +52,10 @@ class CampaignCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Game box art
+                // Game box art — Twitch first, external fallback if that fails.
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
-                  child: campaign.boxArtUrl.isNotEmpty
-                      ? Image.network(
-                          campaign.boxArtUrl,
-                          width: 40,
-                          height: 53,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, error, ___) {
-                            // ignore: avoid_print
-                            print('[CampaignCard] Image failed to load '
-                                '(${campaign.boxArtUrl}): $error');
-                            return _fallbackArt(cs);
-                          },
-                        )
-                      : _fallbackArt(cs),
+                  child: _buildArt(campaign, cs),
                 ),
                 const SizedBox(width: 12),
 
@@ -59,7 +65,7 @@ class CampaignCard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          if (isActivelymining) ...[
+                          if (widget.isActivelymining) ...[
                             Container(
                               width: 8,
                               height: 8,
@@ -122,6 +128,43 @@ class CampaignCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildArt(DropCampaign campaign, ColorScheme cs) {
+    // 1) Try Twitch's own box art first.
+    if (campaign.boxArtUrl.isNotEmpty && !_twitchImageFailed) {
+      return Image.network(
+        campaign.boxArtUrl,
+        width: 40,
+        height: 53,
+        fit: BoxFit.cover,
+        errorBuilder: (_, error, ___) {
+          // ignore: avoid_print
+          print('[CampaignCard] Twitch image failed (${campaign.boxArtUrl}): $error');
+          // Schedule a rebuild using the Steam fallback instead.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _twitchImageFailed = true);
+          });
+          return _fallbackArt(cs);
+        },
+      );
+    }
+
+    // 2) Twitch failed or had no URL — try the Steam fallback.
+    if (_fallbackUrl != null) {
+      return Image.network(
+        _fallbackUrl!,
+        width: 40,
+        height: 53,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _fallbackArt(cs),
+      );
+    }
+
+    // 3) Nothing yet — kick off the fallback fetch and show a placeholder
+    // in the meantime.
+    _requestFallback();
+    return _fallbackArt(cs);
   }
 
   Widget _fallbackArt(ColorScheme cs) => Container(

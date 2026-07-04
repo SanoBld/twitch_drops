@@ -3,12 +3,14 @@ import 'package:window_manager/window_manager.dart';
 import 'package:tray_manager/tray_manager.dart';
 
 class TrayService with TrayListener, WindowListener {
-  final void Function() onShowWindow;
-  final void Function() onQuit;
-  final void Function() onStopMining;
-  // Optional extra hooks — pass no-op callbacks if not wired yet.
-  final void Function()? onToggleAutoMining;
-  final void Function()? onRefreshNow;
+  // Not final: main.dart sets safe defaults at startup, then HomeScreen
+  // rewires these to the real implementations once it's mounted (it's the
+  // only place that has access to MiningService/CampaignService).
+  void Function() onShowWindow;
+  void Function() onQuit;
+  void Function() onStopMining;
+  void Function()? onToggleAutoMining;
+  void Function()? onRefreshNow;
 
   String? _miningChannel;
   String? _miningGame;

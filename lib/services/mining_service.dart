@@ -121,10 +121,22 @@ class MiningService {
       _updateDropProgress(dropId, currentMinutes: current);
     } else if (eventType == 'drop-claim') {
       final dropId = data['drop_id']?.toString();
+      final dropInstanceId = data['drop_instance_id']?.toString();
       if (dropId == null) return;
-      _log.log('Drop $dropId is ready to claim (per Twitch)',
+      _log.log('Drop $dropId is ready to claim (per Twitch) — claiming automatically',
           tag: 'MiningService');
       _updateDropProgress(dropId, claimed: true);
+      if (dropInstanceId != null) {
+        gql.claimDropReward(dropInstanceId).then((ok) {
+          _log.log(
+            ok
+                ? 'Successfully claimed drop $dropId'
+                : 'Failed to auto-claim drop $dropId (will still show as complete; '
+                    'claim it manually on twitch.tv/drops/inventory if needed)',
+            tag: 'MiningService',
+          );
+        });
+      }
     }
   }
 
