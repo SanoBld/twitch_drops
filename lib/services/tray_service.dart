@@ -114,7 +114,21 @@ class TrayService with TrayListener, WindowListener {
   }
 
   @override
-  void onTrayIconMouseDown() => onShowWindow();
+  void onTrayIconMouseDown() {
+    // Left click only — show the window. Do NOT do this for right-click,
+    // or it steals focus and dismisses the context menu before Windows
+    // can display it (this was the real bug: every click, including
+    // right-click, was triggering onShowWindow()).
+    onShowWindow();
+  }
+
+  @override
+  void onTrayIconRightMouseDown() {
+    // Explicitly pop up the context menu on right-click instead of
+    // relying on the OS to do it automatically — on Windows this is
+    // what actually makes the menu appear reliably with tray_manager.
+    trayManager.popUpContextMenu();
+  }
 
   @override
   void onTrayMenuItemClick(MenuItem item) {
