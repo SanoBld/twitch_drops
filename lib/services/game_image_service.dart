@@ -34,9 +34,12 @@ class GameImageService {
         return null;
       }
       final appId = items.first['id'];
-      // Steam's CDN header image — wide, high quality, no key needed.
+      // Use the portrait "library" capsule (600x900) instead of the wide
+      // header (460x215) — it matches Twitch box-art proportions (roughly
+      // 2:3 portrait), so BoxFit.cover doesn't have to zoom/crop nearly
+      // as aggressively to fill a tall, narrow slot.
       final url =
-          'https://cdn.cloudflare.steamstatic.com/steam/apps/$appId/header.jpg';
+          'https://cdn.cloudflare.steamstatic.com/steam/apps/$appId/library_600x900.jpg';
       _cache[gameName] = url;
       return url;
     } catch (e) {
