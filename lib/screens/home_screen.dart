@@ -422,7 +422,7 @@ class _MiningControlBarState extends State<_MiningControlBar> {
               Icon(
                 widget.autoMining ? Icons.auto_mode : Icons.touch_app_outlined,
                 size: 15,
-                color: cs.primary,
+                color: cs.secondary,
               ),
               const SizedBox(width: 6),
               Text(
@@ -436,13 +436,17 @@ class _MiningControlBarState extends State<_MiningControlBar> {
               ),
               if (widget.activeChannel != null) ...[
                 const SizedBox(width: 4),
-                Icon(Icons.circle, size: 7, color: cs.primary),
+                _PulsingDotSmall(color: cs.secondary),
                 const SizedBox(width: 4),
                 Flexible(
-                  child: Text(
-                    widget.activeChannel!.displayName,
-                    style: tt.labelMedium?.copyWith(fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: Text(
+                      widget.activeChannel!.displayName,
+                      key: ValueKey(widget.activeChannel!.displayName),
+                      style: tt.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
               ],
@@ -561,17 +565,70 @@ class _DropsTab extends StatelessWidget {
         itemCount: campaigns.length,
         itemBuilder: (_, i) {
           final campaign = campaigns[i];
-          return InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () => onMineCampaign(campaign),
-            child: CampaignCard(
-              campaign: campaign,
-              isActivelymining: activeChannel != null &&
-                  campaign.gameId == activeChannel!.gameId,
+          return TweenAnimationBuilder<double>(
+            key: ValueKey(campaign.id),
+            tween: Tween(begin: 0, end: 1),
+            duration: Duration(milliseconds: 220 + (i.clamp(0, 12) * 25)),
+            curve: Curves.easeOut,
+            builder: (context, t, child) => Opacity(
+              opacity: t,
+              child: Transform.translate(
+                offset: Offset(0, (1 - t) * 8),
+                child: child,
+              ),
+            ),
+            child: GestureDetector(
+              onTap: () => onMineCampaign(campaign),
+              child: CampaignCard(
+                campaign: campaign,
+                isActivelymining: activeChannel != null &&
+                    campaign.gameId == activeChannel!.gameId,
+              ),
             ),
           );
         },
       ),
+    );
+  }
+}
+
+// Small breathing dot for "live" indicators in the top control bar.
+class _PulsingDotSmall extends StatefulWidget {
+  final Color color;
+  const _PulsingDotSmall({required this.color});
+
+  @override
+  State<_PulsingDotSmall> createState() => _PulsingDotSmallState();
+}
+
+class _PulsingDotSmallState extends State<_PulsingDotSmall>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = Curves.easeInOut.transform(_controller.value);
+        return Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            color: widget.color.withValues(alpha: 0.5 + 0.5 * t),
+            shape: BoxShape.circle,
+          ),
+        );
+      },
     );
   }
 }

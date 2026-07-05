@@ -20,6 +20,7 @@ class _CampaignCardState extends State<CampaignCard> {
   bool _twitchImageFailed = false;
   String? _fallbackUrl;
   bool _fallbackRequested = false;
+  bool _hovered = false;
 
   void _requestFallback() {
     if (_fallbackRequested) return;
@@ -36,102 +37,118 @@ class _CampaignCardState extends State<CampaignCard> {
     final campaign = widget.campaign;
     final daysLeft = campaign.endAt.difference(DateTime.now()).inDays;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: widget.isActivelymining
-            ? BorderSide(color: cs.primary, width: 1.5)
-            : BorderSide.none,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Game box art — Twitch first, external fallback if that fails.
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: _buildArt(campaign, cs),
-                ),
-                const SizedBox(width: 12),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          if (widget.isActivelymining) ...[
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: cs.primary,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                          ],
-                          Expanded(
-                            child: Text(campaign.gameName,
-                                style: tt.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.bold),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis),
-                          ),
-                          if (!campaign.isAccountConnected) ...[
-                            const SizedBox(width: 6),
-                            Icon(Icons.link_off,
-                                size: 14,
-                                color: cs.error.withValues(alpha: 0.7)),
-                          ],
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: daysLeft <= 3
-                                  ? cs.errorContainer
-                                  : cs.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              daysLeft <= 0
-                                  ? 'Ends today'
-                                  : daysLeft == 1
-                                      ? '1 day left'
-                                      : '$daysLeft days left',
-                              style: tt.labelSmall?.copyWith(
-                                color: daysLeft <= 3 ? cs.onErrorContainer : null,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(campaign.name,
-                          style: tt.bodySmall
-                              ?.copyWith(color: cs.onSurfaceVariant),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                    ],
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        transform: Matrix4.identity()..scale(_hovered ? 1.006 : 1.0),
+        transformAlignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: widget.isActivelymining
+              ? cs.secondaryContainer.withValues(alpha: 0.55)
+              : cs.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(14),
+          border: widget.isActivelymining
+              ? Border.all(color: cs.secondary, width: 1.4)
+              : Border.all(color: Colors.transparent),
+          boxShadow: _hovered
+              ? [
+                  BoxShadow(
+                    color: cs.shadow.withValues(alpha: 0.12),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ...campaign.drops.map((d) => _DropRow(drop: d)),
-          ],
+                ]
+              : [],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: _buildArt(campaign, cs),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            if (widget.isActivelymining) ...[
+                              _PulsingDot(color: cs.secondary),
+                              const SizedBox(width: 6),
+                            ],
+                            Expanded(
+                              child: Text(campaign.gameName,
+                                  style: tt.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis),
+                            ),
+                            if (!campaign.isAccountConnected) ...[
+                              const SizedBox(width: 6),
+                              Icon(Icons.link_off,
+                                  size: 14,
+                                  color: cs.error.withValues(alpha: 0.7)),
+                            ],
+                            const SizedBox(width: 8),
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 220),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: daysLeft <= 3
+                                    ? cs.tertiaryContainer
+                                    : cs.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                daysLeft <= 0
+                                    ? 'Ends today'
+                                    : daysLeft == 1
+                                        ? '1 day left'
+                                        : '$daysLeft days left',
+                                style: tt.labelSmall?.copyWith(
+                                  color: daysLeft <= 3
+                                      ? cs.onTertiaryContainer
+                                      : null,
+                                  fontWeight:
+                                      daysLeft <= 3 ? FontWeight.w600 : null,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(campaign.name,
+                            style: tt.bodySmall
+                                ?.copyWith(color: cs.onSurfaceVariant),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ...campaign.drops.map((d) => _DropRow(drop: d)),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildArt(DropCampaign campaign, ColorScheme cs) {
-    // 1) Try Twitch's own box art first.
     if (campaign.boxArtUrl.isNotEmpty && !_twitchImageFailed) {
       return Image.network(
         campaign.boxArtUrl,
@@ -141,7 +158,6 @@ class _CampaignCardState extends State<CampaignCard> {
         errorBuilder: (_, error, ___) {
           // ignore: avoid_print
           print('[CampaignCard] Twitch image failed (${campaign.boxArtUrl}): $error');
-          // Schedule a rebuild using the Steam fallback instead.
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) setState(() => _twitchImageFailed = true);
           });
@@ -149,8 +165,6 @@ class _CampaignCardState extends State<CampaignCard> {
         },
       );
     }
-
-    // 2) Twitch failed or had no URL — try the Steam fallback.
     if (_fallbackUrl != null) {
       return Image.network(
         _fallbackUrl!,
@@ -160,9 +174,6 @@ class _CampaignCardState extends State<CampaignCard> {
         errorBuilder: (_, __, ___) => _fallbackArt(cs),
       );
     }
-
-    // 3) Nothing yet — kick off the fallback fetch and show a placeholder
-    // in the meantime.
     _requestFallback();
     return _fallbackArt(cs);
   }
@@ -174,6 +185,48 @@ class _CampaignCardState extends State<CampaignCard> {
         child: Icon(Icons.videogame_asset_outlined,
             size: 20, color: cs.onSurfaceVariant),
       );
+}
+
+// A soft breathing dot to mark "actively mining" — subtle organic motion
+// instead of a static indicator.
+class _PulsingDot extends StatefulWidget {
+  final Color color;
+  const _PulsingDot({required this.color});
+
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = Curves.easeInOut.transform(_controller.value);
+        return Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: widget.color.withValues(alpha: 0.5 + 0.5 * t),
+            shape: BoxShape.circle,
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _DropRow extends StatelessWidget {
@@ -201,11 +254,11 @@ class _DropRow extends StatelessWidget {
               const SizedBox(width: 8),
               if (drop.claimed)
                 Row(children: [
-                  Icon(Icons.check_circle_outline,
-                      size: 14, color: cs.primary),
+                  Icon(Icons.check_circle, size: 14, color: cs.secondary),
                   const SizedBox(width: 4),
                   Text('Claimed',
-                      style: tt.labelSmall?.copyWith(color: cs.primary)),
+                      style: tt.labelSmall?.copyWith(
+                          color: cs.secondary, fontWeight: FontWeight.w600)),
                 ])
               else
                 Text(
@@ -220,12 +273,18 @@ class _DropRow extends StatelessWidget {
           const SizedBox(height: 4),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: drop.claimed ? 1.0 : drop.progress,
-              minHeight: 6,
-              backgroundColor: cs.surfaceContainerHighest,
-              valueColor: AlwaysStoppedAnimation(
-                  drop.claimed ? cs.primary.withValues(alpha: 0.5) : cs.primary),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: drop.claimed ? 1.0 : drop.progress),
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, _) => LinearProgressIndicator(
+                value: value,
+                minHeight: 6,
+                backgroundColor: cs.surfaceContainerHighest,
+                valueColor: AlwaysStoppedAnimation(
+                  drop.claimed ? cs.secondary.withValues(alpha: 0.6) : cs.secondary,
+                ),
+              ),
             ),
           ),
         ],
