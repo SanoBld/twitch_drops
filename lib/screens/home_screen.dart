@@ -8,6 +8,7 @@ import '../services/gql_service.dart';
 import '../services/campaign_service.dart';
 import '../services/mining_service.dart';
 import '../widgets/campaign_card.dart';
+import '../widgets/campaign_views.dart';
 import '../widgets/update_dialog.dart';
 import '../app_strings.dart';
 import 'settings_screen.dart';
@@ -53,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _error;
   bool _autoMining = true;
   bool _linkedOnly = true;
+  CampaignViewMode _viewMode = CampaignViewMode.list;
 
   @override
   void initState() {
@@ -216,9 +218,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       autoMining: _autoMining,
                       linkedOnly: _linkedOnly,
                       activeChannel: _activeChannel,
+                      viewMode: _viewMode,
                       onAutoMiningChanged: _toggleAutoMining,
                       onLinkedOnlyChanged: (v) =>
                           setState(() => _linkedOnly = v),
+                      onViewModeChanged: (m) => setState(() => _viewMode = m),
                     ),
 
                   Expanded(
@@ -230,6 +234,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           loading: _loading,
                           error: _error,
                           activeChannel: _activeChannel,
+                          viewMode: _viewMode,
                           onRefresh: _refresh,
                           onMineCampaign: _mineCampaign,
                         ),
@@ -352,16 +357,20 @@ class _MiningControlBar extends StatefulWidget {
   final bool autoMining;
   final bool linkedOnly;
   final Channel? activeChannel;
+  final CampaignViewMode viewMode;
   final ValueChanged<bool> onAutoMiningChanged;
   final ValueChanged<bool> onLinkedOnlyChanged;
+  final ValueChanged<CampaignViewMode> onViewModeChanged;
 
   const _MiningControlBar({
     required this.miningService,
     required this.autoMining,
     required this.linkedOnly,
     required this.activeChannel,
+    required this.viewMode,
     required this.onAutoMiningChanged,
     required this.onLinkedOnlyChanged,
+    required this.onViewModeChanged,
   });
 
   @override
@@ -451,6 +460,33 @@ class _MiningControlBarState extends State<_MiningControlBar> {
                 ),
               ],
               const Spacer(),
+              SegmentedButton<CampaignViewMode>(
+                showSelectedIcon: false,
+                style: const ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                segments: const [
+                  ButtonSegment(
+                    value: CampaignViewMode.list,
+                    icon: Icon(Icons.view_list_outlined, size: 16),
+                    tooltip: 'Liste',
+                  ),
+                  ButtonSegment(
+                    value: CampaignViewMode.poster,
+                    icon: Icon(Icons.grid_view_outlined, size: 16),
+                    tooltip: 'Affiches',
+                  ),
+                  ButtonSegment(
+                    value: CampaignViewMode.compact,
+                    icon: Icon(Icons.table_rows_outlined, size: 16),
+                    tooltip: 'Tableau compact',
+                  ),
+                ],
+                selected: {widget.viewMode},
+                onSelectionChanged: (s) => widget.onViewModeChanged(s.first),
+              ),
+              const SizedBox(width: 8),
               FilterChip(
                 visualDensity: VisualDensity.compact,
                 label: Text(tr('linked_only')),
@@ -483,6 +519,7 @@ class _DropsTab extends StatelessWidget {
   final bool loading;
   final String? error;
   final Channel? activeChannel;
+  final CampaignViewMode viewMode;
   final VoidCallback onRefresh;
   final ValueChanged<DropCampaign> onMineCampaign;
 
@@ -491,6 +528,7 @@ class _DropsTab extends StatelessWidget {
     required this.loading,
     required this.error,
     required this.activeChannel,
+    required this.viewMode,
     required this.onRefresh,
     required this.onMineCampaign,
   });
@@ -558,37 +596,52 @@ class _DropsTab extends StatelessWidget {
       );
     }
 
-    return Scrollbar(
-      thumbVisibility: true,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        itemCount: campaigns.length,
-        itemBuilder: (_, i) {
-          final campaign = campaigns[i];
-          return TweenAnimationBuilder<double>(
-            key: ValueKey(campaign.id),
-            tween: Tween(begin: 0, end: 1),
-            duration: Duration(milliseconds: 220 + (i.clamp(0, 12) * 25)),
-            curve: Curves.easeOut,
-            builder: (context, t, child) => Opacity(
-              opacity: t,
-              child: Transform.translate(
-                offset: Offset(0, (1 - t) * 8),
-                child: child,
-              ),
-            ),
-            child: GestureDetector(
-              onTap: () => onMineCampaign(campaign),
-              child: CampaignCard(
-                campaign: campaign,
-                isActivelymining: activeChannel != null &&
-                    campaign.gameId == activeChannel!.gameId,
-              ),
-            ),
-          );
-        },
-      ),
-    );
+    switch (viewMode) {
+      case CampaignViewMode.poster:
+        return PosterCampaignGrid(
+          campaigns: campaigns,
+          activeChannelGameId: activeChannel?.gameId,
+          onMineCampaign: onMineCampaign,
+        );
+      case CampaignViewMode.compact:
+        return CompactCampaignList(
+          campaigns: campaigns,
+          activeChannelGameId: activeChannel?.gameId,
+          onMineCampaign: onMineCampaign,
+        );
+      case CampaignViewMode.list:
+        return Scrollbar(
+          thumbVisibility: true,
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            itemCount: campaigns.length,
+            itemBuilder: (_, i) {
+              final campaign = campaigns[i];
+              return TweenAnimationBuilder<double>(
+                key: ValueKey(campaign.id),
+                tween: Tween(begin: 0, end: 1),
+                duration: Duration(milliseconds: 220 + (i.clamp(0, 12) * 25)),
+                curve: Curves.easeOut,
+                builder: (context, t, child) => Opacity(
+                  opacity: t,
+                  child: Transform.translate(
+                    offset: Offset(0, (1 - t) * 8),
+                    child: child,
+                  ),
+                ),
+                child: GestureDetector(
+                  onTap: () => onMineCampaign(campaign),
+                  child: CampaignCard(
+                    campaign: campaign,
+                    isActivelymining: activeChannel != null &&
+                        campaign.gameId == activeChannel!.gameId,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+    }
   }
 }
 

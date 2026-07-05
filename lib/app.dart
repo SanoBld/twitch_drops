@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
+import 'package:system_theme/system_theme.dart';
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
@@ -20,66 +22,40 @@ class _AppState extends State<App> {
     _auth.load().then((_) => setState(() => _ready = true));
   }
 
-  // A warmer, more "alive" accent than plain Twitch purple — still reads
-  // as Twitch but with more character.
-  static const _seed = Color(0xFF9146FF);
+  // Single, coherent seed: the user's actual Windows accent color (falls
+  // back to Twitch purple on platforms where it isn't available). Material
+  // 3 derives ALL the other tones (secondary, tertiary, containers, etc.)
+  // from this one seed automatically, so nothing clashes — no more manually
+  // hand-picked colors fighting each other.
+  Color get _seed =>
+      SystemTheme.accentColor.accent; // has a safe built-in fallback already
 
   ThemeData _buildTheme(Brightness brightness) {
-    final scheme = ColorScheme.fromSeed(
-      seedColor: _seed,
-      brightness: brightness,
-      // Give action colors (mining active, success, danger) more presence
-      // instead of pure Material defaults.
-      primary: brightness == Brightness.dark
-          ? const Color(0xFFA970FF)
-          : const Color(0xFF7B2FE0),
-      secondary: brightness == Brightness.dark
-          ? const Color(0xFF35D07F) // organic green for "live/active"
-          : const Color(0xFF1E9A5C),
-      tertiary: brightness == Brightness.dark
-          ? const Color(0xFFFFB454) // warm amber for "expiring soon"
-          : const Color(0xFFE08A1E),
-    );
-
+    final scheme = ColorScheme.fromSeed(seedColor: _seed, brightness: brightness);
     return ThemeData(
       colorScheme: scheme,
       useMaterial3: true,
       brightness: brightness,
       splashFactory: InkSparkle.splashFactory,
       visualDensity: VisualDensity.comfortable,
+      scaffoldBackgroundColor: scheme.surface,
       cardTheme: CardThemeData(
         elevation: 0,
         color: scheme.surfaceContainerHigh,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       chipTheme: ChipThemeData(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-      ),
-      switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected) ? scheme.secondary : null),
-        trackColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected)
-                ? scheme.secondary.withValues(alpha: 0.4)
-                : null),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       navigationRailTheme: NavigationRailThemeData(
         indicatorColor: scheme.primaryContainer,
-        indicatorShape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
-          // Fade instead of the mobile-style slide-up-from-bottom — reads
-          // as a desktop app, not a phone.
-          TargetPlatform.windows: FadeThroughPageTransitionBuilder(),
-          TargetPlatform.linux: FadeThroughPageTransitionBuilder(),
-          TargetPlatform.macOS: FadeThroughPageTransitionBuilder(),
+          TargetPlatform.windows: _FadePageTransitionsBuilder(),
+          TargetPlatform.linux: _FadePageTransitionsBuilder(),
+          TargetPlatform.macOS: _FadePageTransitionsBuilder(),
         },
       ),
     );
@@ -90,28 +66,28 @@ class _AppState extends State<App> {
     return MaterialApp(
       title: 'Twitch Drops Miner',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.system, // follows Windows light/dark automatically
+      themeMode: ThemeMode.system,
       theme: _buildTheme(Brightness.light),
       darkTheme: _buildTheme(Brightness.dark),
+      // Wraps every screen with a custom, in-app Windows title bar (drag
+      // area + minimize/maximize/close), replacing the native OS chrome.
+      builder: (context, child) => Column(
+        children: [
+          const _CustomTitleBar(),
+          Expanded(child: child ?? const SizedBox()),
+        ],
+      ),
       home: !_ready
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : _auth.isLoggedIn
-              ? HomeScreen(
-                  auth: _auth,
-                  onLogout: () => setState(() {}),
-                )
-              : LoginScreen(
-                  auth: _auth,
-                  onLoggedIn: () => setState(() {}),
-                ),
+              ? HomeScreen(auth: _auth, onLogout: () => setState(() {}))
+              : LoginScreen(auth: _auth, onLoggedIn: () => setState(() {})),
     );
   }
 }
 
-// A gentle cross-fade transition (used instead of Material's default
-// mobile-oriented slide transition) — feels calmer and more "desktop".
-class FadeThroughPageTransitionBuilder extends PageTransitionsBuilder {
-  const FadeThroughPageTransitionBuilder();
+class _FadePageTransitionsBuilder extends PageTransitionsBuilder {
+  const _FadePageTransitionsBuilder();
 
   @override
   Widget buildTransitions<T>(
@@ -124,6 +100,144 @@ class FadeThroughPageTransitionBuilder extends PageTransitionsBuilder {
     return FadeTransition(
       opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
       child: child,
+    );
+  }
+}
+
+// A minimal custom title bar replacing the native Windows one: draggable
+// area with the app name, plus minimize / maximize-restore / close buttons
+// styled to match the app's theme instead of stock OS chrome.
+class _CustomTitleBar extends StatefulWidget {
+  const _CustomTitleBar();
+
+  @override
+  State<_CustomTitleBar> createState() => _CustomTitleBarState();
+}
+
+class _CustomTitleBarState extends State<_CustomTitleBar> with WindowListener {
+  bool _isMaximized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    windowManager.addListener(this);
+    windowManager.isMaximized().then((v) {
+      if (mounted) setState(() => _isMaximized = v);
+    });
+  }
+
+  @override
+  void dispose() {
+    windowManager.removeListener(this);
+    super.dispose();
+  }
+
+  @override
+  void onWindowMaximize() => setState(() => _isMaximized = true);
+
+  @override
+  void onWindowUnmaximize() => setState(() => _isMaximized = false);
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      height: 32,
+      color: cs.surface,
+      child: Row(
+        children: [
+          Expanded(
+            child: DragToMoveArea(
+              child: Container(
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.only(left: 12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.bolt, size: 15, color: cs.primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Twitch Drops Miner',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          _TitleBarButton(
+            icon: Icons.remove,
+            onPressed: () => windowManager.minimize(),
+          ),
+          _TitleBarButton(
+            icon: _isMaximized ? Icons.filter_none : Icons.crop_square,
+            iconSize: _isMaximized ? 13 : 14,
+            onPressed: () async {
+              if (await windowManager.isMaximized()) {
+                windowManager.unmaximize();
+              } else {
+                windowManager.maximize();
+              }
+            },
+          ),
+          _TitleBarButton(
+            icon: Icons.close,
+            hoverColor: Colors.red,
+            onPressed: () => windowManager.close(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TitleBarButton extends StatefulWidget {
+  final IconData icon;
+  final double iconSize;
+  final Color? hoverColor;
+  final VoidCallback onPressed;
+
+  const _TitleBarButton({
+    required this.icon,
+    required this.onPressed,
+    this.iconSize = 15,
+    this.hoverColor,
+  });
+
+  @override
+  State<_TitleBarButton> createState() => _TitleBarButtonState();
+}
+
+class _TitleBarButtonState extends State<_TitleBarButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final bg = widget.hoverColor ?? cs.surfaceContainerHighest;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          width: 46,
+          height: 32,
+          color: _hovered ? bg : Colors.transparent,
+          alignment: Alignment.center,
+          child: Icon(
+            widget.icon,
+            size: widget.iconSize,
+            color: _hovered && widget.hoverColor != null
+                ? Colors.white
+                : cs.onSurfaceVariant,
+          ),
+        ),
+      ),
     );
   }
 }

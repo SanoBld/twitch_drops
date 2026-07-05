@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:system_theme/system_theme.dart';
 import 'app.dart';
 import 'services/tray_service.dart';
 import 'services/autostart_service.dart';
@@ -10,11 +11,18 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
 
-  const windowOptions = WindowOptions(
-    size: Size(960, 660),
-    minimumSize: Size(720, 520),
+  // Load the real Windows accent color before the first frame so the
+  // theme is correct immediately (no flash of the fallback color).
+  await SystemTheme.accentColor.load();
+
+  final windowOptions = WindowOptions(
+    size: const Size(960, 660),
+    minimumSize: const Size(720, 520),
     center: true,
     title: 'Twitch Drops Miner',
+    // Hides the native OS title bar/border — app.dart draws its own
+    // custom title bar (drag area + min/max/close) instead.
+    titleBarStyle: TitleBarStyle.hidden,
   );
   await windowManager.waitUntilReadyToShow(windowOptions, () async {
     await windowManager.show();
