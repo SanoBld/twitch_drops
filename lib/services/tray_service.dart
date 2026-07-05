@@ -1,6 +1,7 @@
 import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:tray_manager/tray_manager.dart';
+import 'log_service.dart';
 
 class TrayService with TrayListener, WindowListener {
   // Not final: main.dart sets safe defaults at startup, then HomeScreen
@@ -11,6 +12,8 @@ class TrayService with TrayListener, WindowListener {
   void Function() onStopMining;
   void Function()? onToggleAutoMining;
   void Function()? onRefreshNow;
+
+  final _log = LogService();
 
   String? _miningChannel;
   String? _miningGame;
@@ -29,9 +32,18 @@ class TrayService with TrayListener, WindowListener {
     trayManager.addListener(this);
     windowManager.addListener(this);
     await windowManager.setPreventClose(true);
-    await trayManager.setIcon('assets/tray_icon.ico');
-    await trayManager.setToolTip('Twitch Drops Miner');
+    try {
+      await trayManager.setIcon('assets/tray_icon.ico');
+    } catch (e) {
+      _log.log('setIcon failed: $e', tag: 'TrayService');
+    }
+    try {
+      await trayManager.setToolTip('Twitch Drops Miner');
+    } catch (e) {
+      _log.log('setToolTip failed: $e', tag: 'TrayService');
+    }
     await _rebuildMenu();
+    _log.log('TrayService.init() completed', tag: 'TrayService');
   }
 
   // Call this whenever the mined channel changes so the tray menu reflects it.
@@ -57,42 +69,48 @@ class TrayService with TrayListener, WindowListener {
   }
 
   Future<void> _rebuildMenu() async {
-    final progressLabel = _miningProgress != null
-        ? '${(_miningProgress! * 100).toStringAsFixed(0)}%'
-        : null;
+    try {
+      final progressLabel = _miningProgress != null
+          ? '${(_miningProgress! * 100).toStringAsFixed(0)}%'
+          : null;
 
-    final items = <MenuItem>[
-      MenuItem(key: 'show', label: 'Show window'),
-      MenuItem.separator(),
-      if (_miningChannel != null) ...[
-        MenuItem(
-          key: 'status',
-          label: '⚡ Mining: $_miningChannel'
-              '${_miningGame != null ? ' ($_miningGame)' : ''}',
-          disabled: true,
-        ),
-        if (progressLabel != null)
+      final items = <MenuItem>[
+        MenuItem(key: 'show', label: 'Show window'),
+        MenuItem.separator(),
+        if (_miningChannel != null) ...[
           MenuItem(
-            key: 'progress',
-            label: 'Current drop: $progressLabel',
+            key: 'status',
+            label: '⚡ Mining: $_miningChannel'
+                '${_miningGame != null ? ' ($_miningGame)' : ''}',
             disabled: true,
           ),
-        MenuItem(key: 'stop', label: 'Stop mining'),
-      ] else
-        MenuItem(key: 'status', label: 'Idle', disabled: true),
-      MenuItem.separator(),
-      MenuItem(
-        key: 'toggle_auto',
-        label: _autoMiningEnabled
-            ? 'Disable auto-mining'
-            : 'Enable auto-mining',
-      ),
-      MenuItem(key: 'refresh', label: 'Refresh campaigns now'),
-      MenuItem(key: 'inventory', label: 'Open Twitch inventory'),
-      MenuItem.separator(),
-      MenuItem(key: 'quit', label: 'Quit'),
-    ];
-    await trayManager.setContextMenu(Menu(items: items));
+          if (progressLabel != null)
+            MenuItem(
+              key: 'progress',
+              label: 'Current drop: $progressLabel',
+              disabled: true,
+            ),
+          MenuItem(key: 'stop', label: 'Stop mining'),
+        ] else
+          MenuItem(key: 'status', label: 'Idle', disabled: true),
+        MenuItem.separator(),
+        MenuItem(
+          key: 'toggle_auto',
+          label: _autoMiningEnabled
+              ? 'Disable auto-mining'
+              : 'Enable auto-mining',
+        ),
+        MenuItem(key: 'refresh', label: 'Refresh campaigns now'),
+        MenuItem(key: 'inventory', label: 'Open Twitch inventory'),
+        MenuItem.separator(),
+        MenuItem(key: 'quit', label: 'Quit'),
+      ];
+      await trayManager.setContextMenu(Menu(items: items));
+      _log.log('Tray menu rebuilt successfully (${items.length} items)',
+          tag: 'TrayService');
+    } catch (e, st) {
+      _log.log('_rebuildMenu FAILED: $e\n$st', tag: 'TrayService');
+    }
   }
 
   @override
