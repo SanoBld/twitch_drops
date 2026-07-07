@@ -238,6 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           viewMode: _viewMode,
                           onRefresh: _refresh,
                           onMineCampaign: _mineCampaign,
+                          miningService: _miningService,
                         ),
                         FiltersScreen(campaigns: _campaigns),
                         SettingsScreen(
@@ -530,6 +531,101 @@ class _MiningControlBarState extends State<_MiningControlBar> {
   }
 }
 
+// Right-click on a campaign: shows ONLY that game's live channels, with
+// live viewer counts, and lets the user pick one manually.
+class _ChannelPickerDialog extends StatefulWidget {
+  final DropCampaign campaign;
+  final MiningService miningService;
+  const _ChannelPickerDialog({required this.campaign, required this.miningService});
+
+  @override
+  State<_ChannelPickerDialog> createState() => _ChannelPickerDialogState();
+}
+
+class _ChannelPickerDialogState extends State<_ChannelPickerDialog> {
+  List<Channel>? _channels;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.miningService.fetchLiveChannelsForCampaign(widget.campaign).then((c) {
+      if (mounted) setState(() => _channels = c);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380, maxHeight: 440),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.campaign.gameName,
+                  style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              if (_channels == null)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_channels!.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Text('Aucune chaîne en direct',
+                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                )
+              else
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _channels!.length,
+                    itemBuilder: (_, i) {
+                      final c = _channels![i];
+                      return ListTile(
+                        dense: true,
+                        title: Text(c.displayName),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.remove_red_eye_outlined,
+                                size: 14, color: cs.onSurfaceVariant),
+                            const SizedBox(width: 4),
+                            Text('${c.viewers}',
+                                style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                          ],
+                        ),
+                        onTap: () {
+                          widget.miningService.mineChannel(widget.campaign, c);
+                          Navigator.of(context).pop();
+                        },
+                      );
+                    },
+                  ),
+                ),
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Fermer'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // Expandable details panel: websocket status, campaign/drop progress with
 // remaining time, and a list of live channels for the currently-mined game
 // (fetched on demand, only while the panel is open).
@@ -727,6 +823,7 @@ class _DropsTab extends StatelessWidget {
   final CampaignViewMode viewMode;
   final VoidCallback onRefresh;
   final ValueChanged<DropCampaign> onMineCampaign;
+  final MiningService miningService;
 
   const _DropsTab({
     required this.campaigns,
@@ -736,6 +833,7 @@ class _DropsTab extends StatelessWidget {
     required this.viewMode,
     required this.onRefresh,
     required this.onMineCampaign,
+    required this.miningService,
   });
 
   @override
@@ -836,6 +934,13 @@ class _DropsTab extends StatelessWidget {
                 ),
                 child: GestureDetector(
                   onTap: () => onMineCampaign(campaign),
+                  onSecondaryTapDown: (_) => showDialog(
+                    context: context,
+                    builder: (_) => _ChannelPickerDialog(
+                      campaign: campaign,
+                      miningService: miningService,
+                    ),
+                  ),
                   child: CampaignCard(
                     campaign: campaign,
                     isActivelymining: activeChannel != null &&

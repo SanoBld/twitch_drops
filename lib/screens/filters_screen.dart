@@ -20,6 +20,8 @@ class _FiltersScreenState extends State<FiltersScreen> {
   List<String> _priorityOrder = [];
   Set<String> _excluded = {};
   SortMode _sortMode = SortMode.expiringSoonest;
+  final _prioritySearchController = TextEditingController();
+  String _priorityQuery = '';
 
   // Computed on demand instead of cached once in initState: widget.campaigns
   // is empty on first build (campaigns load async), so caching it there
@@ -43,6 +45,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _prioritySearchController.dispose();
     super.dispose();
   }
 
@@ -133,13 +136,65 @@ class _FiltersScreenState extends State<FiltersScreen> {
                 ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 8),
+          TextField(
+            controller: _prioritySearchController,
+            decoration: InputDecoration(
+              isDense: true,
+              prefixIcon: const Icon(Icons.search, size: 18),
+              hintText: 'Rechercher un jeu…',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              suffixIcon: _priorityQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 16),
+                      onPressed: () {
+                        _prioritySearchController.clear();
+                        setState(() => _priorityQuery = '');
+                      },
+                    )
+                  : null,
+            ),
+            onChanged: (v) => setState(() => _priorityQuery = v),
+          ),
+          const SizedBox(height: 8),
           Card(
             child: _priorityOrder.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.all(16),
                     child: Text('—'),
                   )
-                : ReorderableListView(
+                : _priorityQuery.isNotEmpty
+                    // Filtered view: reordering is disabled while searching
+                    // (indices wouldn't map cleanly back to the full list),
+                    // but a tap moves the game straight to the top.
+                    ? Column(
+                        children: [
+                          for (final id in _priorityOrder.where((id) =>
+                              (_games[id] ?? id)
+                                  .toLowerCase()
+                                  .contains(_priorityQuery.toLowerCase())))
+                            ListTile(
+                              dense: true,
+                              leading: CircleAvatar(
+                                radius: 14,
+                                child: Text('${_priorityOrder.indexOf(id) + 1}',
+                                    style: const TextStyle(fontSize: 12)),
+                              ),
+                              title: Text(_games[id] ?? id),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.vertical_align_top, size: 18),
+                                tooltip: 'Mettre en premier',
+                                onPressed: () {
+                                  setState(() {
+                                    _priorityOrder.remove(id);
+                                    _priorityOrder.insert(0, id);
+                                  });
+                                  _savePriority();
+                                },
+                              ),
+                            ),
+                        ],
+                      )
+                    : ReorderableListView(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     onReorder: (oldIndex, newIndex) {

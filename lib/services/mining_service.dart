@@ -235,6 +235,35 @@ class MiningService {
   // Fetches the live channels list (with viewer counts) for whichever
   // campaign is currently being mined, for on-demand display in the UI's
   // details panel. Returns an empty list if nothing is being mined.
+  // Fetches live channels for ANY campaign (not just the active one), used
+  // by the right-click "pick a channel" dialog.
+  Future<List<Channel>> fetchLiveChannelsForCampaign(DropCampaign campaign) async {
+    if (campaign.gameSlug.isEmpty) return [];
+    try {
+      final channels = await _channelService.fetchLiveChannels(
+          campaign.gameSlug, campaign.gameId, campaign.gameName);
+      channels.sort((a, b) => b.viewers.compareTo(a.viewers));
+      return channels;
+    } catch (e) {
+      _log.log('fetchLiveChannelsForCampaign failed: $e', tag: 'MiningService');
+      return [];
+    }
+  }
+
+  // Manually pin a specific channel (picked by the user), bypassing
+  // auto-selection entirely.
+  Future<void> mineChannel(DropCampaign campaign, Channel channel) async {
+    autoMiningEnabled = false;
+    _manualCampaign = campaign;
+    if (activeChannel?.broadcastId == channel.broadcastId) return;
+    activeChannel = channel;
+    miningStartedAt = DateTime.now();
+    _log.log('Manually pinned channel ${channel.displayName} (${campaign.gameName})',
+        tag: 'MiningService');
+    _statusController.add(activeChannel);
+    _ping();
+  }
+
   Future<List<Channel>> fetchLiveChannelsForActiveGame() async {
     final ch = activeChannel;
     if (ch == null) return [];
