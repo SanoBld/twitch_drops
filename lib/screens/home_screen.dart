@@ -55,6 +55,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _autoMining = true;
   bool _linkedOnly = true;
   CampaignViewMode _viewMode = CampaignViewMode.list;
+  String? _statusBanner;
+  Timer? _bannerTimer;
 
   @override
   void initState() {
@@ -65,6 +67,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _miningService.onChannelChanged.listen((ch) {
       if (mounted) setState(() => _activeChannel = ch);
       _pushTrayStatus(ch);
+      _showBanner(ch != null
+          ? 'Changement vers ${ch.displayName} (${ch.gameName})…'
+          : 'Minage arrêté');
     });
     _miningService.onCampaignsUpdated.listen((_) {
       // Real Twitch-confirmed progress came in — refresh the list so
@@ -91,7 +96,18 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _miningService.dispose();
+    _bannerTimer?.cancel();
     super.dispose();
+  }
+
+  // Shows a short-lived status message at the top of the window (e.g. on
+  // channel switch), then auto-hides it.
+  void _showBanner(String text) {
+    _bannerTimer?.cancel();
+    setState(() => _statusBanner = text);
+    _bannerTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _statusBanner = null);
+    });
   }
 
   void _pushTrayStatus(Channel? ch) {
@@ -212,6 +228,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
 
+                  if (_statusBanner != null) _StatusBanner(text: _statusBanner!),
+
                   if (_navIndex == 0)
                     _MiningControlBar(
                       miningService: _miningService,
@@ -265,6 +283,44 @@ class _HomeScreenState extends State<HomeScreen> {
 
 // ── Logo ────────────────────────────────────────────────────────────────────
 
+// Thin, auto-dismissing banner shown at the top on state changes (e.g.
+// "changement vers <chaîne>…") so the user always sees *something happened*.
+class _StatusBanner extends StatelessWidget {
+  final String text;
+  const _StatusBanner({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return AnimatedContainer(
+      key: ValueKey(text),
+      duration: const Duration(milliseconds: 200),
+      width: double.infinity,
+      color: cs.secondaryContainer,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: cs.onSecondaryContainer,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: cs.onSecondaryContainer,
+                    )),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AppLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -276,8 +332,19 @@ class _AppLogo extends StatelessWidget {
         color: cs.primaryContainer,
         shape: BoxShape.circle,
       ),
-      child: Center(
-        child: Icon(Icons.bolt, color: cs.onPrimaryContainer, size: 18),
+      child: ClipOval(
+        // Drop your own logo at assets/logo.png (square, ~128x128) and
+        // declare it under flutter/assets in pubspec.yaml to use it here.
+        // Falls back to the bolt icon if the file isn't there.
+        child: Image.asset(
+          'assets/logo.png',
+          width: 34,
+          height: 34,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Center(
+            child: Icon(Icons.bolt, color: cs.onPrimaryContainer, size: 18),
+          ),
+        ),
       ),
     );
   }
@@ -531,100 +598,6 @@ class _MiningControlBarState extends State<_MiningControlBar> {
   }
 }
 
-// Right-click on a campaign: shows ONLY that game's live channels, with
-// live viewer counts, and lets the user pick one manually.
-class _ChannelPickerDialog extends StatefulWidget {
-  final DropCampaign campaign;
-  final MiningService miningService;
-  const _ChannelPickerDialog({required this.campaign, required this.miningService});
-
-  @override
-  State<_ChannelPickerDialog> createState() => _ChannelPickerDialogState();
-}
-
-class _ChannelPickerDialogState extends State<_ChannelPickerDialog> {
-  List<Channel>? _channels;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.miningService.fetchLiveChannelsForCampaign(widget.campaign).then((c) {
-      if (mounted) setState(() => _channels = c);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 380, maxHeight: 440),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(widget.campaign.gameName,
-                  style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 12),
-              if (_channels == null)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_channels!.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  child: Text('Aucune chaîne en direct',
-                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                )
-              else
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: _channels!.length,
-                    itemBuilder: (_, i) {
-                      final c = _channels![i];
-                      return ListTile(
-                        dense: true,
-                        title: Text(c.displayName),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.remove_red_eye_outlined,
-                                size: 14, color: cs.onSurfaceVariant),
-                            const SizedBox(width: 4),
-                            Text('${c.viewers}',
-                                style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-                          ],
-                        ),
-                        onTap: () {
-                          widget.miningService.mineChannel(widget.campaign, c);
-                          Navigator.of(context).pop();
-                        },
-                      );
-                    },
-                  ),
-                ),
-              const SizedBox(height: 4),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Fermer'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // Expandable details panel: websocket status, campaign/drop progress with
 // remaining time, and a list of live channels for the currently-mined game
@@ -905,12 +878,14 @@ class _DropsTab extends StatelessWidget {
           campaigns: campaigns,
           activeChannelGameId: activeChannel?.gameId,
           onMineCampaign: onMineCampaign,
+          miningService: miningService,
         );
       case CampaignViewMode.compact:
         return CompactCampaignList(
           campaigns: campaigns,
           activeChannelGameId: activeChannel?.gameId,
           onMineCampaign: onMineCampaign,
+          miningService: miningService,
         );
       case CampaignViewMode.list:
         return Scrollbar(
@@ -936,7 +911,7 @@ class _DropsTab extends StatelessWidget {
                   onTap: () => onMineCampaign(campaign),
                   onSecondaryTapDown: (_) => showDialog(
                     context: context,
-                    builder: (_) => _ChannelPickerDialog(
+                    builder: (_) => ChannelPickerDialog(
                       campaign: campaign,
                       miningService: miningService,
                     ),

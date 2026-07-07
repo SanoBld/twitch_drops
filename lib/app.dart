@@ -155,7 +155,9 @@ class _CustomTitleBarState extends State<_CustomTitleBar> with WindowListener {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.bolt, size: 15, color: cs.primary),
+                    Image.asset('assets/logo.png', width: 15, height: 15,
+                        errorBuilder: (_, __, ___) =>
+                            Icon(Icons.bolt, size: 15, color: cs.primary)),
                     const SizedBox(width: 6),
                     Text(
                       'Twitch Drops Miner',
@@ -170,11 +172,13 @@ class _CustomTitleBarState extends State<_CustomTitleBar> with WindowListener {
           ),
           _TitleBarButton(
             icon: Icons.remove,
+            tooltip: 'Réduire',
             onPressed: () => windowManager.minimize(),
           ),
           _TitleBarButton(
             icon: _isMaximized ? Icons.filter_none : Icons.crop_square,
             iconSize: _isMaximized ? 13 : 14,
+            tooltip: _isMaximized ? 'Restaurer' : 'Agrandir',
             onPressed: () async {
               if (await windowManager.isMaximized()) {
                 windowManager.unmaximize();
@@ -186,6 +190,7 @@ class _CustomTitleBarState extends State<_CustomTitleBar> with WindowListener {
           _TitleBarButton(
             icon: Icons.close,
             hoverColor: Colors.red,
+            tooltip: 'Fermer (réduit dans la barre des tâches)',
             onPressed: () => windowManager.close(),
           ),
         ],
@@ -199,12 +204,14 @@ class _TitleBarButton extends StatefulWidget {
   final double iconSize;
   final Color? hoverColor;
   final VoidCallback onPressed;
+  final String? tooltip;
 
   const _TitleBarButton({
     required this.icon,
     required this.onPressed,
     this.iconSize = 15,
     this.hoverColor,
+    this.tooltip,
   });
 
   @override
@@ -218,24 +225,27 @@ class _TitleBarButtonState extends State<_TitleBarButton> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final bg = widget.hoverColor ?? cs.surfaceContainerHighest;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onPressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          width: 46,
-          height: 32,
-          color: _hovered ? bg : Colors.transparent,
-          alignment: Alignment.center,
-          child: Icon(
-            widget.icon,
-            size: widget.iconSize,
-            color: _hovered && widget.hoverColor != null
-                ? Colors.white
-                : cs.onSurfaceVariant,
+    return Tooltip(
+      message: widget.tooltip ?? '',
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: widget.onPressed,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            width: 46,
+            height: 32,
+            color: _hovered ? bg : Colors.transparent,
+            alignment: Alignment.center,
+            child: Icon(
+              widget.icon,
+              size: widget.iconSize,
+              color: _hovered && widget.hoverColor != null
+                  ? Colors.white
+                  : cs.onSurfaceVariant,
+            ),
           ),
         ),
       ),

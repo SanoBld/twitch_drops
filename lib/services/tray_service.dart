@@ -57,8 +57,8 @@ class TrayService with TrayListener, WindowListener {
     _miningProgress = progress;
     await trayManager.setToolTip(
       channelName != null
-          ? 'Twitch Drops Miner — Mining $channelName'
-          : 'Twitch Drops Miner — Idle',
+          ? 'Twitch Drops Miner — En train de miner $channelName'
+          : 'Twitch Drops Miner — Inactif',
     );
     await _rebuildMenu();
   }
@@ -75,35 +75,35 @@ class TrayService with TrayListener, WindowListener {
           : null;
 
       final items = <MenuItem>[
-        MenuItem(key: 'show', label: 'Show window'),
+        MenuItem(key: 'show', label: 'Afficher la fenêtre'),
         MenuItem.separator(),
         if (_miningChannel != null) ...[
           MenuItem(
             key: 'status',
-            label: '⚡ Mining: $_miningChannel'
+            label: '⚡ Minage : $_miningChannel'
                 '${_miningGame != null ? ' ($_miningGame)' : ''}',
             disabled: true,
           ),
           if (progressLabel != null)
             MenuItem(
               key: 'progress',
-              label: 'Current drop: $progressLabel',
+              label: 'Drop actuel : $progressLabel',
               disabled: true,
             ),
-          MenuItem(key: 'stop', label: 'Stop mining'),
+          MenuItem(key: 'stop', label: 'Arrêter le minage'),
         ] else
-          MenuItem(key: 'status', label: 'Idle', disabled: true),
+          MenuItem(key: 'status', label: 'Inactif', disabled: true),
         MenuItem.separator(),
         MenuItem(
           key: 'toggle_auto',
           label: _autoMiningEnabled
-              ? 'Disable auto-mining'
-              : 'Enable auto-mining',
+              ? 'Désactiver le minage auto'
+              : 'Activer le minage auto',
         ),
-        MenuItem(key: 'refresh', label: 'Refresh campaigns now'),
-        MenuItem(key: 'inventory', label: 'Open Twitch inventory'),
+        MenuItem(key: 'refresh', label: 'Actualiser les campagnes'),
+        MenuItem(key: 'inventory', label: "Ouvrir l'inventaire Twitch"),
         MenuItem.separator(),
-        MenuItem(key: 'quit', label: 'Quit'),
+        MenuItem(key: 'quit', label: 'Quitter'),
       ];
       await trayManager.setContextMenu(Menu(items: items));
       _log.log('Tray menu rebuilt successfully (${items.length} items)',

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/drop_campaign.dart';
 import '../services/game_image_service.dart';
+import '../services/mining_service.dart';
+import '../models/channel.dart';
 
 enum CampaignViewMode { list, poster, compact }
 
@@ -22,12 +24,14 @@ class PosterCampaignGrid extends StatelessWidget {
   final List<DropCampaign> campaigns;
   final Object? activeChannelGameId;
   final ValueChanged<DropCampaign> onMineCampaign;
+  final MiningService miningService;
 
   const PosterCampaignGrid({
     super.key,
     required this.campaigns,
     required this.activeChannelGameId,
     required this.onMineCampaign,
+    required this.miningService,
   });
 
   @override
@@ -52,7 +56,7 @@ class PosterCampaignGrid extends StatelessWidget {
             onTap: () => onMineCampaign(c),
             onDetails: () => showDialog(
               context: context,
-              builder: (_) => _CampaignDetailsDialog(campaign: c),
+              builder: (_) => ChannelPickerDialog(campaign: c, miningService: miningService),
             ),
           );
         },
@@ -228,12 +232,14 @@ class CompactCampaignList extends StatelessWidget {
   final List<DropCampaign> campaigns;
   final Object? activeChannelGameId;
   final ValueChanged<DropCampaign> onMineCampaign;
+  final MiningService miningService;
 
   const CompactCampaignList({
     super.key,
     required this.campaigns,
     required this.activeChannelGameId,
     required this.onMineCampaign,
+    required this.miningService,
   });
 
   @override
@@ -255,7 +261,7 @@ class CompactCampaignList extends StatelessWidget {
             onTap: () => onMineCampaign(c),
             onSecondaryTapDown: (_) => showDialog(
               context: context,
-              builder: (_) => _CampaignDetailsDialog(campaign: c),
+              builder: (_) => ChannelPickerDialog(campaign: c, miningService: miningService),
             ),
             child: Container(
               height: 40,
@@ -396,6 +402,101 @@ class _CampaignDetailsDialog extends StatelessWidget {
                       ],
                     ),
                   )),
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Fermer'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Right-click on a campaign: shows ONLY that game's live channels, with
+// live viewer counts, and lets the user pick one manually.
+class ChannelPickerDialog extends StatefulWidget {
+  final DropCampaign campaign;
+  final MiningService miningService;
+  const ChannelPickerDialog({required this.campaign, required this.miningService});
+
+  @override
+  State<ChannelPickerDialog> createState() => ChannelPickerDialogState();
+}
+
+class ChannelPickerDialogState extends State<ChannelPickerDialog> {
+  List<Channel>? _channels;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.miningService.fetchLiveChannelsForCampaign(widget.campaign).then((c) {
+      if (mounted) setState(() => _channels = c);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380, maxHeight: 440),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.campaign.gameName,
+                  style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              if (_channels == null)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_channels!.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Text('Aucune chaîne en direct',
+                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                )
+              else
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _channels!.length,
+                    itemBuilder: (_, i) {
+                      final c = _channels![i];
+                      return ListTile(
+                        dense: true,
+                        title: Text(c.displayName),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.remove_red_eye_outlined,
+                                size: 14, color: cs.onSurfaceVariant),
+                            const SizedBox(width: 4),
+                            Text('${c.viewers}',
+                                style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                          ],
+                        ),
+                        onTap: () {
+                          widget.miningService.mineChannel(widget.campaign, c);
+                          Navigator.of(context).pop();
+                        },
+                      );
+                    },
+                  ),
+                ),
               const SizedBox(height: 4),
               Align(
                 alignment: Alignment.centerRight,
