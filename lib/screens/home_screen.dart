@@ -215,6 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (_navIndex == 0)
                     _MiningControlBar(
                       miningService: _miningService,
+                      campaigns: _campaigns,
                       autoMining: _autoMining,
                       linkedOnly: _linkedOnly,
                       activeChannel: _activeChannel,
@@ -354,6 +355,7 @@ class _TopBar extends StatelessWidget {
 
 class _MiningControlBar extends StatefulWidget {
   final MiningService miningService;
+  final List<DropCampaign> campaigns;
   final bool autoMining;
   final bool linkedOnly;
   final Channel? activeChannel;
@@ -364,6 +366,7 @@ class _MiningControlBar extends StatefulWidget {
 
   const _MiningControlBar({
     required this.miningService,
+    required this.campaigns,
     required this.autoMining,
     required this.linkedOnly,
     required this.activeChannel,
@@ -379,6 +382,7 @@ class _MiningControlBar extends StatefulWidget {
 
 class _MiningControlBarState extends State<_MiningControlBar> {
   Timer? _ticker;
+  bool _detailsOpen = false;
 
   @override
   void initState() {
@@ -494,6 +498,14 @@ class _MiningControlBarState extends State<_MiningControlBar> {
                 onSelected: widget.onLinkedOnlyChanged,
                 avatar: Icon(widget.linkedOnly ? Icons.link : Icons.link_off, size: 14),
               ),
+              const SizedBox(width: 4),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: tr('mining_details'),
+                iconSize: 18,
+                icon: Icon(_detailsOpen ? Icons.expand_less : Icons.expand_more),
+                onPressed: () => setState(() => _detailsOpen = !_detailsOpen),
+              ),
             ],
           ),
           if (widget.activeChannel != null && sessionDuration != null)
@@ -504,6 +516,199 @@ class _MiningControlBarState extends State<_MiningControlBar> {
                     ? 'Mining depuis ${_fmtDuration(sessionDuration)} · prochain envoi dans ${nextPingIn.inSeconds}s'
                     : 'Mining depuis ${_fmtDuration(sessionDuration)} · envoi en cours…',
                 style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ),
+          if (_detailsOpen)
+            _MiningDetailsPanel(
+              miningService: widget.miningService,
+              campaigns: widget.campaigns,
+              activeChannel: widget.activeChannel,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// Expandable details panel: websocket status, campaign/drop progress with
+// remaining time, and a list of live channels for the currently-mined game
+// (fetched on demand, only while the panel is open).
+class _MiningDetailsPanel extends StatefulWidget {
+  final MiningService miningService;
+  final List<DropCampaign> campaigns;
+  final Channel? activeChannel;
+
+  const _MiningDetailsPanel({
+    required this.miningService,
+    required this.campaigns,
+    required this.activeChannel,
+  });
+
+  @override
+  State<_MiningDetailsPanel> createState() => _MiningDetailsPanelState();
+}
+
+class _MiningDetailsPanelState extends State<_MiningDetailsPanel> {
+  List<Channel>? _channels;
+  bool _loadingChannels = false;
+  StreamSubscription<bool>? _sub;
+  bool _socketConnected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _socketConnected = widget.miningService.socketConnected;
+    _sub = widget.miningService.onSocketConnectionChanged.listen((v) {
+      if (mounted) setState(() => _socketConnected = v);
+    });
+    _loadChannels();
+  }
+
+  @override
+  void didUpdateWidget(covariant _MiningDetailsPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.activeChannel?.gameId != widget.activeChannel?.gameId) {
+      _loadChannels();
+    }
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadChannels() async {
+    setState(() => _loadingChannels = true);
+    final list = await widget.miningService.fetchLiveChannelsForActiveGame();
+    if (mounted) setState(() {
+      _channels = list;
+      _loadingChannels = false;
+    });
+  }
+
+  String _fmtRemaining(Duration d) {
+    if (d.inMinutes <= 0) return '0m';
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
+    return h > 0 ? '${h}h${m.toString().padLeft(2, '0')}' : '${m}m';
+  }
+
+  DropCampaign? get _activeCampaign {
+    final ch = widget.activeChannel;
+    if (ch == null) return null;
+    for (final c in widget.campaigns) {
+      if (c.gameId == ch.gameId) return c;
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final campaign = _activeCampaign;
+    final drop = campaign?.drops.where((d) => !d.claimed).cast<TimeBasedDrop?>().firstWhere(
+          (d) => d != null,
+          orElse: () => null,
+        );
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Websocket status ─────────────────────────────────────
+          Row(
+            children: [
+              Icon(_socketConnected ? Icons.wifi : Icons.wifi_off,
+                  size: 14,
+                  color: _socketConnected ? cs.secondary : cs.error),
+              const SizedBox(width: 6),
+              Text(
+                _socketConnected ? tr('socket_connected') : tr('socket_disconnected'),
+                style: tt.labelSmall,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // ── Campaign / drop progress ──────────────────────────────
+          if (campaign != null) ...[
+            Text(campaign.gameName, style: tt.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
+            Text(campaign.name, style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+            if (drop != null) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(child: Text(drop.name, style: tt.labelSmall)),
+                  Text(
+                    '${(drop.progress * 100).toStringAsFixed(0)}% · '
+                    '${_fmtRemaining(Duration(minutes: drop.remainingMinutes))} restantes',
+                    style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: drop.progress,
+                  minHeight: 6,
+                  backgroundColor: cs.surfaceContainerHighest,
+                  valueColor: AlwaysStoppedAnimation(cs.secondary),
+                ),
+              ),
+            ],
+          ] else
+            Text(tr('nothing_mined'), style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+
+          const SizedBox(height: 12),
+
+          // ── Live channels ──────────────────────────────────────────
+          Row(
+            children: [
+              Text(tr('live_channels'), style: tt.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(width: 8),
+              if (_loadingChannels)
+                const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (!_loadingChannels && (_channels == null || _channels!.isEmpty))
+            Text('—', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant))
+          else
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 160),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _channels?.length ?? 0,
+                itemBuilder: (_, i) {
+                  final c = _channels![i];
+                  final isActive = widget.activeChannel?.broadcastId == c.broadcastId;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        if (isActive) Icon(Icons.play_arrow, size: 12, color: cs.secondary)
+                        else const SizedBox(width: 12),
+                        const SizedBox(width: 4),
+                        Expanded(child: Text(c.displayName,
+                            style: tt.labelSmall?.copyWith(
+                                fontWeight: isActive ? FontWeight.w700 : null),
+                            overflow: TextOverflow.ellipsis)),
+                        Icon(Icons.remove_red_eye_outlined, size: 12, color: cs.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Text('${c.viewers}', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
         ],

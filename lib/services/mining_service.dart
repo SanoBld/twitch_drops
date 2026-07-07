@@ -43,6 +43,12 @@ class MiningService {
 
   TwitchSocketService? _socket;
 
+  bool get socketConnected => _socket?.connected ?? false;
+  Stream<bool> get onSocketConnectionChanged =>
+      _socket?.onConnectionChanged ?? const Stream.empty();
+
+  List<DropCampaign> get campaigns => _campaigns;
+
   MiningService(this.gql) {
     _channelService = ChannelService(gql);
   }
@@ -223,6 +229,28 @@ class MiningService {
     } catch (e) {
       _log.log('mineCampaign failed for "${campaign.gameName}": $e',
           tag: 'MiningService');
+    }
+  }
+
+  // Fetches the live channels list (with viewer counts) for whichever
+  // campaign is currently being mined, for on-demand display in the UI's
+  // details panel. Returns an empty list if nothing is being mined.
+  Future<List<Channel>> fetchLiveChannelsForActiveGame() async {
+    final ch = activeChannel;
+    if (ch == null) return [];
+    final campaign = _campaigns.cast<DropCampaign?>().firstWhere(
+          (c) => c?.gameId == ch.gameId,
+          orElse: () => null,
+        );
+    if (campaign == null || campaign.gameSlug.isEmpty) return [];
+    try {
+      final channels = await _channelService.fetchLiveChannels(
+          campaign.gameSlug, campaign.gameId, campaign.gameName);
+      channels.sort((a, b) => b.viewers.compareTo(a.viewers));
+      return channels;
+    } catch (e) {
+      _log.log('fetchLiveChannelsForActiveGame failed: $e', tag: 'MiningService');
+      return [];
     }
   }
 

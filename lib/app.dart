@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:system_theme/system_theme.dart';
 import 'services/auth_service.dart';
+import 'services/theme_settings.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 
@@ -22,13 +23,10 @@ class _AppState extends State<App> {
     _auth.load().then((_) => setState(() => _ready = true));
   }
 
-  // Single, coherent seed: the user's actual Windows accent color (falls
-  // back to Twitch purple on platforms where it isn't available). Material
-  // 3 derives ALL the other tones (secondary, tertiary, containers, etc.)
-  // from this one seed automatically, so nothing clashes — no more manually
-  // hand-picked colors fighting each other.
-  Color get _seed =>
-      SystemTheme.accentColor.accent; // has a safe built-in fallback already
+  // Seed color: either the OS accent color or a user-picked custom color,
+  // via ThemeSettings. Material 3 derives all other tones (secondary,
+  // tertiary, containers, etc.) from this one seed automatically.
+  Color get _seed => ThemeSettings().seed;
 
   ThemeData _buildTheme(Brightness brightness) {
     final scheme = ColorScheme.fromSeed(seedColor: _seed, brightness: brightness);
@@ -63,25 +61,29 @@ class _AppState extends State<App> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Twitch Drops Miner',
-      debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.system,
-      theme: _buildTheme(Brightness.light),
-      darkTheme: _buildTheme(Brightness.dark),
-      // Wraps every screen with a custom, in-app Windows title bar (drag
-      // area + minimize/maximize/close), replacing the native OS chrome.
-      builder: (context, child) => Column(
-        children: [
-          const _CustomTitleBar(),
-          Expanded(child: child ?? const SizedBox()),
-        ],
+    // Rebuilds whenever the user changes the theme mode/color in Settings.
+    return AnimatedBuilder(
+      animation: ThemeSettings(),
+      builder: (context, _) => MaterialApp(
+        title: 'Twitch Drops Miner',
+        debugShowCheckedModeBanner: false,
+        themeMode: ThemeMode.system,
+        theme: _buildTheme(Brightness.light),
+        darkTheme: _buildTheme(Brightness.dark),
+        // Wraps every screen with a custom, in-app Windows title bar (drag
+        // area + minimize/maximize/close), replacing the native OS chrome.
+        builder: (context, child) => Column(
+          children: [
+            const _CustomTitleBar(),
+            Expanded(child: child ?? const SizedBox()),
+          ],
+        ),
+        home: !_ready
+            ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+            : _auth.isLoggedIn
+                ? HomeScreen(auth: _auth, onLogout: () => setState(() {}))
+                : LoginScreen(auth: _auth, onLoggedIn: () => setState(() {})),
       ),
-      home: !_ready
-          ? const Scaffold(body: Center(child: CircularProgressIndicator()))
-          : _auth.isLoggedIn
-              ? HomeScreen(auth: _auth, onLogout: () => setState(() {}))
-              : LoginScreen(auth: _auth, onLoggedIn: () => setState(() {})),
     );
   }
 }

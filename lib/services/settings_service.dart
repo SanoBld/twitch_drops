@@ -70,4 +70,29 @@ class SettingsService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_languageKey, code);
   }
+
+  // ── Theme (system accent vs custom color) ─────────────────────────
+  static const _themeUseSystemKey = 'theme_use_system';
+  static const _themeCustomColorKey = 'theme_custom_color';
+
+  Future<bool> loadUseSystemTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_themeUseSystemKey) ?? true;
+  }
+
+  Future<void> saveUseSystemTheme(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_themeUseSystemKey, value);
+  }
+
+  // Stored as 0xAARRGGBB int.
+  Future<int?> loadCustomColor() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_themeCustomColorKey);
+  }
+
+  Future<void> saveCustomColor(int argb) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_themeCustomColorKey, argb);
+  }
 }

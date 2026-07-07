@@ -16,6 +16,10 @@ class TwitchSocketService {
   final void Function(Map<String, dynamic> event) onEvent;
   final _log = LogService();
 
+  bool connected = false;
+  final _connectionController = StreamController<bool>.broadcast();
+  Stream<bool> get onConnectionChanged => _connectionController.stream;
+
   TwitchSocketService(this.onEvent);
 
   // authToken is required for authenticated topics like user-drop-events.
@@ -30,9 +34,19 @@ class TwitchSocketService {
           _log.log('Failed to decode pubsub message: $e', tag: 'Socket');
         }
       },
-      onError: (e) => _log.log('Socket error: $e', tag: 'Socket'),
-      onDone: () => _log.log('Socket closed', tag: 'Socket'),
+      onError: (e) {
+        _log.log('Socket error: $e', tag: 'Socket');
+        connected = false;
+        _connectionController.add(false);
+      },
+      onDone: () {
+        _log.log('Socket closed', tag: 'Socket');
+        connected = false;
+        _connectionController.add(false);
+      },
     );
+    connected = true;
+    _connectionController.add(true);
 
     final listenData = <String, dynamic>{'topics': topics};
     if (authToken != null) listenData['auth_token'] = authToken;
@@ -54,5 +68,7 @@ class TwitchSocketService {
   void disconnect() {
     _pingTimer?.cancel();
     _channel?.sink.close();
+    connected = false;
+    _connectionController.add(false);
   }
 }

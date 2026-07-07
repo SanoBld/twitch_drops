@@ -21,16 +21,23 @@ class _FiltersScreenState extends State<FiltersScreen> {
   Set<String> _excluded = {};
   SortMode _sortMode = SortMode.expiringSoonest;
 
-  // Deduplicated list of (gameId -> gameName) across all campaigns.
-  late final Map<String, String> _games;
+  // Computed on demand instead of cached once in initState: widget.campaigns
+  // is empty on first build (campaigns load async), so caching it there
+  // froze search on a permanently-empty list.
+  Map<String, String> get _games => {
+        for (final c in widget.campaigns) c.gameId: c.gameName,
+      };
 
   @override
   void initState() {
     super.initState();
-    _games = {
-      for (final c in widget.campaigns) c.gameId: c.gameName,
-    };
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant FiltersScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.campaigns.length != widget.campaigns.length) _load();
   }
 
   @override

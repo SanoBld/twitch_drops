@@ -4,6 +4,7 @@ import '../models/drop_campaign.dart';
 import '../services/auth_service.dart';
 import '../services/autostart_service.dart';
 import '../services/settings_service.dart';
+import '../services/theme_settings.dart';
 import '../app_strings.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -84,6 +85,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       children: [
+        // ── Theme ────────────────────────────────────────────────────
+        _SectionHeader(title: tr('theme')),
+        AnimatedBuilder(
+          animation: ThemeSettings(),
+          builder: (context, _) => Card(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  secondary: const Icon(Icons.palette_outlined),
+                  title: Text(tr('theme_use_system')),
+                  subtitle: Text(tr('theme_use_system_sub')),
+                  value: ThemeSettings().useSystem,
+                  onChanged: (v) => ThemeSettings().setUseSystem(v),
+                ),
+                if (!ThemeSettings().useSystem) ...[
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        for (final c in _presetColors)
+                          _ColorSwatch(
+                            color: c,
+                            selected: ThemeSettings().customColor.value == c.value,
+                            onTap: () => ThemeSettings().setCustomColor(c),
+                          ),
+                        _CustomColorButton(
+                          current: ThemeSettings().customColor,
+                          onPicked: (c) => ThemeSettings().setCustomColor(c),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
         // ── Language ─────────────────────────────────────────────────
         _SectionHeader(title: tr('language')),
         Card(
@@ -216,6 +260,135 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 24),
+      ],
+    );
+  }
+}
+
+const _presetColors = [
+  Colors.deepPurple,
+  Colors.indigo,
+  Colors.blue,
+  Colors.teal,
+  Colors.green,
+  Colors.amber,
+  Colors.deepOrange,
+  Colors.red,
+  Colors.pink,
+];
+
+class _ColorSwatch extends StatelessWidget {
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+  const _ColorSwatch(
+      {required this.color, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: selected
+              ? Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2)
+              : null,
+        ),
+        child: selected ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
+      ),
+    );
+  }
+}
+
+// Opens a simple HSV color picker dialog (hue slider + shade grid) so the
+// user can pick ANY color, not just the presets.
+class _CustomColorButton extends StatelessWidget {
+  final Color current;
+  final ValueChanged<Color> onPicked;
+  const _CustomColorButton({required this.current, required this.onPicked});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        final picked = await showDialog<Color>(
+          context: context,
+          builder: (_) => _ColorPickerDialog(initial: current),
+        );
+        if (picked != null) onPicked(picked);
+      },
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Theme.of(context).colorScheme.outline),
+          gradient: const SweepGradient(
+            colors: [Colors.red, Colors.yellow, Colors.green, Colors.cyan, Colors.blue, Colors.purple, Colors.red],
+          ),
+        ),
+        child: const Icon(Icons.add, size: 16, color: Colors.white),
+      ),
+    );
+  }
+}
+
+class _ColorPickerDialog extends StatefulWidget {
+  final Color initial;
+  const _ColorPickerDialog({required this.initial});
+
+  @override
+  State<_ColorPickerDialog> createState() => _ColorPickerDialogState();
+}
+
+class _ColorPickerDialogState extends State<_ColorPickerDialog> {
+  late double _hue = HSVColor.fromColor(widget.initial).hue;
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = HSVColor.fromAHSV(1, _hue, 0.8, 0.9).toColor();
+    return AlertDialog(
+      title: Text(tr('pick_color')),
+      content: SizedBox(
+        width: 280,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(color: preview, shape: BoxShape.circle),
+            ),
+            const SizedBox(height: 16),
+            SliderTheme(
+              data: SliderThemeData(
+                trackHeight: 14,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+              ),
+              child: Slider(
+                value: _hue,
+                min: 0,
+                max: 360,
+                activeColor: preview,
+                onChanged: (v) => setState(() => _hue = v),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(tr('cancel')),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, preview),
+          child: Text(tr('confirm')),
+        ),
       ],
     );
   }
