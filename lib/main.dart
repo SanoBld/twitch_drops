@@ -22,19 +22,8 @@ void main() async {
     minimumSize: const Size(720, 520),
     center: true,
     title: 'Twitch Drops Miner',
-    // Hides the native OS title bar/border — app.dart draws its own
-    // custom title bar (drag area + min/max/close) instead.
-    titleBarStyle: TitleBarStyle.hidden,
   );
   await windowManager.waitUntilReadyToShow(windowOptions, () async {
-    // On Windows, WindowOptions.titleBarStyle alone can leave a thin
-    // native gray strip with the OS's own caption buttons rendered above
-    // our custom title bar (a "double titlebar"). Explicitly forcing
-    // frameless + hidden-with-no-buttons removes the native frame
-    // entirely so only our Flutter-drawn bar remains.
-    await windowManager.setAsFrameless();
-    await windowManager.setTitleBarStyle(TitleBarStyle.hidden,
-        windowButtonVisibility: false);
     await windowManager.show();
     await windowManager.focus();
   });
