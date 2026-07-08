@@ -93,7 +93,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               children: [
                 SwitchListTile(
-                  secondary: const Icon(Icons.palette_outlined),
+                  secondary: const SizedBox.shrink(),
                   title: Text(tr('theme_use_system')),
                   subtitle: Text(tr('theme_use_system_sub')),
                   value: ThemeSettings().useSystem,
@@ -135,7 +135,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                Icon(Icons.language, size: 18, color: cs.onSurfaceVariant),
+                SizedBox.shrink(),
                 const SizedBox(width: 12),
                 Expanded(
                   child: SegmentedButton<String>(
@@ -160,7 +160,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             children: [
               ListTile(
-                leading: const Icon(Icons.account_circle_outlined),
+                leading: const SizedBox.shrink(),
                 title: Text(tr('connected_account')),
                 subtitle: Text(
                   widget.auth.token != null ? tr('token_stored') : tr('not_connected'),
@@ -169,7 +169,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const Divider(height: 1),
               ListTile(
-                leading: Icon(Icons.logout, color: cs.error),
+                leading: SizedBox.shrink(),
                 title: Text(tr('disconnect'), style: TextStyle(color: cs.error)),
                 onTap: () async {
                   final ok = await showDialog<bool>(
@@ -208,7 +208,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             children: [
               SwitchListTile(
-                secondary: const Icon(Icons.rocket_launch_outlined),
+                secondary: const SizedBox.shrink(),
                 title: Text(tr('start_with_system')),
                 subtitle: Text(tr('start_with_system_sub')),
                 value: _autostartEnabled,
@@ -223,7 +223,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const Divider(height: 1),
               SwitchListTile(
-                secondary: const Icon(Icons.minimize_outlined),
+                secondary: const SizedBox.shrink(),
                 title: Text(tr('minimize_to_tray')),
                 subtitle: Text(tr('minimize_to_tray_sub')),
                 value: _minimizeToTray,
@@ -244,16 +244,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             children: [
               ListTile(
-                leading: const Icon(Icons.info_outline),
+                leading: const SizedBox.shrink(),
                 title: const Text('Twitch Drops Miner'),
                 subtitle: Text('Version $_version'),
               ),
               const Divider(height: 1),
               ListTile(
-                leading: const Icon(Icons.code_outlined),
+                leading: const SizedBox.shrink(),
                 title: Text(tr('source_code')),
                 subtitle: const Text('github.com/SanoBld/twitch_drops'),
-                trailing: const Icon(Icons.open_in_new, size: 16),
+                trailing: const SizedBox.shrink(),
                 onTap: () {},
               ),
             ],
@@ -298,7 +298,7 @@ class _ColorSwatch extends StatelessWidget {
               ? Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2)
               : null,
         ),
-        child: selected ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
+        child: selected ? const SizedBox.shrink() : null,
       ),
     );
   }
@@ -331,7 +331,7 @@ class _CustomColorButton extends StatelessWidget {
             colors: [Colors.red, Colors.yellow, Colors.green, Colors.cyan, Colors.blue, Colors.purple, Colors.red],
           ),
         ),
-        child: const Icon(Icons.add, size: 16, color: Colors.white),
+        child: const SizedBox.shrink(),
       ),
     );
   }

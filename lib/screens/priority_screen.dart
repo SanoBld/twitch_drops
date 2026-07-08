@@ -70,7 +70,7 @@ class _PriorityScreenState extends State<PriorityScreen> {
                         key: ValueKey(_order[i]),
                         leading: CircleAvatar(child: Text('${i + 1}')),
                         title: Text(_nameFor(_order[i])),
-                        trailing: const Icon(Icons.drag_handle),
+                        trailing: const SizedBox.shrink(),
                       ),
                   ],
                 ),

@@ -140,12 +140,12 @@ class _FiltersScreenState extends State<FiltersScreen> {
             controller: _prioritySearchController,
             decoration: InputDecoration(
               isDense: true,
-              prefixIcon: const Icon(Icons.search, size: 18),
+              prefixIcon: const SizedBox.shrink(),
               hintText: 'Rechercher un jeu…',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               suffixIcon: _priorityQuery.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear, size: 16),
+                      icon: const SizedBox.shrink(),
                       onPressed: () {
                         _prioritySearchController.clear();
                         setState(() => _priorityQuery = '');
@@ -181,7 +181,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
                               ),
                               title: Text(_games[id] ?? id),
                               trailing: IconButton(
-                                icon: const Icon(Icons.vertical_align_top, size: 18),
+                                icon: const SizedBox.shrink(),
                                 tooltip: 'Mettre en premier',
                                 onPressed: () {
                                   setState(() {
@@ -215,7 +215,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
                                 style: const TextStyle(fontSize: 12)),
                           ),
                           title: Text(_games[_priorityOrder[i]] ?? _priorityOrder[i]),
-                          trailing: const Icon(Icons.drag_handle),
+                          trailing: const SizedBox.shrink(),
                         ),
                     ],
                   ),
@@ -237,12 +237,12 @@ class _FiltersScreenState extends State<FiltersScreen> {
             controller: _searchController,
             decoration: InputDecoration(
               isDense: true,
-              prefixIcon: const Icon(Icons.search, size: 18),
+              prefixIcon: const SizedBox.shrink(),
               hintText: 'Rechercher un jeu…',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               suffixIcon: _query.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear, size: 16),
+                      icon: const SizedBox.shrink(),
                       onPressed: () {
                         _searchController.clear();
                         setState(() => _query = '');

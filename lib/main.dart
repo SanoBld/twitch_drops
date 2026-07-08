@@ -27,6 +27,12 @@ void main() async {
     titleBarStyle: TitleBarStyle.hidden,
   );
   await windowManager.waitUntilReadyToShow(windowOptions, () async {
+    // On some Windows setups, WindowOptions.titleBarStyle alone doesn't
+    // fully suppress the native caption buttons — this call forces it,
+    // which was causing a second, native gray titlebar to render above
+    // our custom one.
+    await windowManager.setTitleBarStyle(TitleBarStyle.hidden,
+        windowButtonVisibility: false);
     await windowManager.show();
     await windowManager.focus();
   });

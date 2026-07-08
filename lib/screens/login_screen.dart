@@ -95,8 +95,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: cs.primaryContainer,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.bolt,
-                      color: cs.onPrimaryContainer, size: 36),
+                  child: SizedBox.shrink(),
                 ),
                 const SizedBox(height: 20),
                 Text('Connect your Twitch account',
@@ -115,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const CircularProgressIndicator(),
 
                 if (_error != null) ...[
-                  Icon(Icons.error_outline, color: cs.error, size: 32),
+                  SizedBox.shrink(),
                   const SizedBox(height: 12),
                   Text(_error!,
                       textAlign: TextAlign.center,
@@ -124,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   FilledButton.icon(
                     onPressed: _start,
-                    icon: const Icon(Icons.refresh),
+                    icon: const SizedBox.shrink(),
                     label: const Text('Retry'),
                   ),
                 ],
@@ -181,8 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.open_in_browser_outlined,
-                              size: 16, color: cs.primary),
+                          SizedBox.shrink(),
                           const SizedBox(width: 6),
                           Text(
                             _codeInfo!.verificationUri,

@@ -97,9 +97,7 @@ class _CampaignCardState extends State<CampaignCard> {
                             ),
                             if (!campaign.isAccountConnected) ...[
                               const SizedBox(width: 6),
-                              Icon(Icons.link_off,
-                                  size: 14,
-                                  color: cs.error.withValues(alpha: 0.7)),
+                              SizedBox.shrink(),
                             ],
                             const SizedBox(width: 8),
                             AnimatedContainer(
@@ -182,8 +180,7 @@ class _CampaignCardState extends State<CampaignCard> {
         width: 40,
         height: 53,
         color: cs.surfaceContainerHighest,
-        child: Icon(Icons.videogame_asset_outlined,
-            size: 20, color: cs.onSurfaceVariant),
+        child: SizedBox.shrink(),
       );
 }
 
@@ -254,7 +251,7 @@ class _DropRow extends StatelessWidget {
               const SizedBox(width: 8),
               if (drop.claimed)
                 Row(children: [
-                  Icon(Icons.check_circle, size: 14, color: cs.secondary),
+                  SizedBox.shrink(),
                   const SizedBox(width: 4),
                   Text('Claimed',
                       style: tt.labelSmall?.copyWith(

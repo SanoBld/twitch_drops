@@ -189,24 +189,20 @@ class _HomeScreenState extends State<HomeScreen> {
               onDestinationSelected: (i) => setState(() => _navIndex = i),
               labelType: NavigationRailLabelType.all,
               minWidth: 64,
-              leading: Padding(
-                padding: const EdgeInsets.only(top: 10, bottom: 12),
-                child: _AppLogo(),
-              ),
               destinations: [
                 NavigationRailDestination(
-                  icon: const Icon(Icons.bolt_outlined),
-                  selectedIcon: const Icon(Icons.bolt),
+                  icon: const SizedBox.shrink(),
+                  selectedIcon: const SizedBox.shrink(),
                   label: Text(tr('nav_drops')),
                 ),
                 const NavigationRailDestination(
-                  icon: Icon(Icons.tune_outlined),
-                  selectedIcon: Icon(Icons.tune),
+                  icon: SizedBox.shrink(),
+                  selectedIcon: SizedBox.shrink(),
                   label: Text('Filtres'),
                 ),
                 NavigationRailDestination(
-                  icon: const Icon(Icons.settings_outlined),
-                  selectedIcon: const Icon(Icons.settings),
+                  icon: const SizedBox.shrink(),
+                  selectedIcon: const SizedBox.shrink(),
                   label: Text(tr('nav_settings')),
                 ),
               ],
@@ -321,34 +317,6 @@ class _StatusBanner extends StatelessWidget {
   }
 }
 
-class _AppLogo extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      width: 34,
-      height: 34,
-      decoration: BoxDecoration(
-        color: cs.primaryContainer,
-        shape: BoxShape.circle,
-      ),
-      child: ClipOval(
-        // Drop your own logo at assets/logo.png (square, ~128x128) and
-        // declare it under flutter/assets in pubspec.yaml to use it here.
-        // Falls back to the bolt icon if the file isn't there.
-        child: Image.asset(
-          'assets/logo.png',
-          width: 34,
-          height: 34,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Center(
-            child: Icon(Icons.bolt, color: cs.onPrimaryContainer, size: 18),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ── Top bar ─────────────────────────────────────────────────────────────────
 
@@ -394,7 +362,7 @@ class _TopBar extends StatelessWidget {
           IconButton(
             iconSize: 18,
             tooltip: tr('debug_logs'),
-            icon: const Icon(Icons.bug_report_outlined),
+            icon: const SizedBox.shrink(),
             onPressed: onOpenDebug,
           ),
           if (navIndex == 0)
@@ -410,7 +378,7 @@ class _TopBar extends StatelessWidget {
                 : IconButton(
                     iconSize: 18,
                     tooltip: tr('refresh_campaigns'),
-                    icon: const Icon(Icons.refresh_outlined),
+                    icon: const SizedBox.shrink(),
                     onPressed: onRefresh,
                   ),
         ],
@@ -500,11 +468,7 @@ class _MiningControlBarState extends State<_MiningControlBar> {
         children: [
           Row(
             children: [
-              Icon(
-                widget.autoMining ? Icons.auto_mode : Icons.touch_app_outlined,
-                size: 15,
-                color: cs.secondary,
-              ),
+              SizedBox.shrink(),
               const SizedBox(width: 6),
               Text(
                 widget.autoMining ? tr('auto_mining') : tr('manual_mining'),
@@ -541,17 +505,17 @@ class _MiningControlBarState extends State<_MiningControlBar> {
                 segments: const [
                   ButtonSegment(
                     value: CampaignViewMode.list,
-                    icon: Icon(Icons.view_list_outlined, size: 16),
+                    icon: SizedBox.shrink(),
                     tooltip: 'Liste',
                   ),
                   ButtonSegment(
                     value: CampaignViewMode.poster,
-                    icon: Icon(Icons.grid_view_outlined, size: 16),
+                    icon: SizedBox.shrink(),
                     tooltip: 'Affiches',
                   ),
                   ButtonSegment(
                     value: CampaignViewMode.compact,
-                    icon: Icon(Icons.table_rows_outlined, size: 16),
+                    icon: SizedBox.shrink(),
                     tooltip: 'Tableau compact',
                   ),
                 ],
@@ -564,14 +528,14 @@ class _MiningControlBarState extends State<_MiningControlBar> {
                 label: Text(tr('linked_only')),
                 selected: widget.linkedOnly,
                 onSelected: widget.onLinkedOnlyChanged,
-                avatar: Icon(widget.linkedOnly ? Icons.link : Icons.link_off, size: 14),
+                avatar: SizedBox.shrink(),
               ),
               const SizedBox(width: 4),
               IconButton(
                 visualDensity: VisualDensity.compact,
                 tooltip: tr('mining_details'),
                 iconSize: 18,
-                icon: Icon(_detailsOpen ? Icons.expand_less : Icons.expand_more),
+                icon: SizedBox.shrink(),
                 onPressed: () => setState(() => _detailsOpen = !_detailsOpen),
               ),
             ],
@@ -695,9 +659,7 @@ class _MiningDetailsPanelState extends State<_MiningDetailsPanel> {
           // ── Websocket status ─────────────────────────────────────
           Row(
             children: [
-              Icon(_socketConnected ? Icons.wifi : Icons.wifi_off,
-                  size: 14,
-                  color: _socketConnected ? cs.secondary : cs.error),
+              SizedBox.shrink(),
               const SizedBox(width: 6),
               Text(
                 _socketConnected ? tr('socket_connected') : tr('socket_disconnected'),
@@ -764,14 +726,14 @@ class _MiningDetailsPanelState extends State<_MiningDetailsPanel> {
                     padding: const EdgeInsets.symmetric(vertical: 2),
                     child: Row(
                       children: [
-                        if (isActive) Icon(Icons.play_arrow, size: 12, color: cs.secondary)
+                        if (isActive) SizedBox.shrink()
                         else const SizedBox(width: 12),
                         const SizedBox(width: 4),
                         Expanded(child: Text(c.displayName,
                             style: tt.labelSmall?.copyWith(
                                 fontWeight: isActive ? FontWeight.w700 : null),
                             overflow: TextOverflow.ellipsis)),
-                        Icon(Icons.remove_red_eye_outlined, size: 12, color: cs.onSurfaceVariant),
+                        SizedBox.shrink(),
                         const SizedBox(width: 4),
                         Text('${c.viewers}', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
                       ],
@@ -825,7 +787,7 @@ class _DropsTab extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.cloud_off_outlined, size: 40, color: cs.error),
+              SizedBox.shrink(),
               const SizedBox(height: 12),
               Text(tr('failed_to_load'), style: tt.titleSmall),
               const SizedBox(height: 6),
@@ -835,7 +797,7 @@ class _DropsTab extends StatelessWidget {
               const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: onRefresh,
-                icon: const Icon(Icons.refresh, size: 16),
+                icon: const SizedBox.shrink(),
                 label: Text(tr('retry')),
               ),
             ],
@@ -851,7 +813,7 @@ class _DropsTab extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.inbox_outlined, size: 40, color: cs.onSurfaceVariant),
+              SizedBox.shrink(),
               const SizedBox(height: 12),
               Text(tr('no_campaigns_title'), style: tt.titleSmall),
               const SizedBox(height: 6),
@@ -863,7 +825,7 @@ class _DropsTab extends StatelessWidget {
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: onRefresh,
-                icon: const Icon(Icons.refresh, size: 16),
+                icon: const SizedBox.shrink(),
                 label: Text(tr('check_again')),
               ),
             ],

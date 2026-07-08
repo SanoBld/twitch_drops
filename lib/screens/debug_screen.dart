@@ -48,12 +48,12 @@ class _DebugScreenState extends State<DebugScreen> {
         actions: [
           IconButton(
             tooltip: 'Copy all',
-            icon: const Icon(Icons.copy_all_outlined),
+            icon: const SizedBox.shrink(),
             onPressed: entries.isEmpty ? null : _copyAll,
           ),
           IconButton(
             tooltip: 'Clear',
-            icon: const Icon(Icons.delete_outline),
+            icon: const SizedBox.shrink(),
             onPressed: entries.isEmpty
                 ? null
                 : () => setState(() => _log.clear()),
@@ -100,7 +100,7 @@ class _DebugScreenState extends State<DebugScreen> {
                   _scrollController.position.maxScrollExtent,
                 );
               },
-              child: const Icon(Icons.arrow_downward),
+              child: const SizedBox.shrink(),
             ),
     );
   }

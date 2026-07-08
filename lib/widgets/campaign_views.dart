@@ -119,7 +119,7 @@ class _PosterTileState extends State<_PosterTile> {
     _requestFallback();
     return Container(
       color: cs.surfaceContainerHighest,
-      child: Icon(Icons.videogame_asset_outlined, color: cs.onSurfaceVariant),
+      child: SizedBox.shrink(),
     );
   }
 
@@ -213,8 +213,7 @@ class _PosterTileState extends State<_PosterTile> {
                   Positioned(
                     top: 6,
                     left: 6,
-                    child: Icon(Icons.link_off,
-                        size: 14, color: Colors.white.withValues(alpha: 0.85)),
+                    child: SizedBox.shrink(),
                   ),
               ],
             ),
@@ -279,7 +278,7 @@ class CompactCampaignList extends StatelessWidget {
                   if (isActive)
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
-                      child: Icon(Icons.bolt, size: 13, color: cs.secondary),
+                      child: SizedBox.shrink(),
                     ),
                   Expanded(
                     flex: 3,
@@ -296,7 +295,7 @@ class CompactCampaignList extends StatelessWidget {
                         style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                   ),
                   if (!c.isAccountConnected)
-                    Icon(Icons.link_off, size: 12, color: cs.error.withValues(alpha: 0.7)),
+                    SizedBox.shrink(),
                   const SizedBox(width: 10),
                   SizedBox(
                     width: 70,
@@ -482,8 +481,7 @@ class ChannelPickerDialogState extends State<ChannelPickerDialog> {
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.remove_red_eye_outlined,
-                                size: 14, color: cs.onSurfaceVariant),
+                            SizedBox.shrink(),
                             const SizedBox(width: 4),
                             Text('${c.viewers}',
                                 style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
