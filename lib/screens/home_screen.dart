@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../services/gql_service.dart';
 import '../services/campaign_service.dart';
 import '../services/mining_service.dart';
+import '../services/settings_service.dart';
 import '../widgets/campaign_card.dart';
 import '../widgets/campaign_views.dart';
 import '../widgets/update_dialog.dart';
@@ -87,6 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
     };
     trayService.onToggleAutoMining = () => _toggleAutoMining(!_autoMining);
     trayService.onRefreshNow = _refresh;
+    SettingsService().getMinimizeToTray().then((v) => trayService.minimizeToTrayEnabled = v);
     _refresh();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       showUpdateDialogIfNeeded(context);
@@ -100,8 +102,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  // Shows a short-lived status message at the top of the window (e.g. on
-  // channel switch), then auto-hides it.
   void _showBanner(String text) {
     _bannerTimer?.cancel();
     setState(() => _statusBanner = text);
@@ -191,18 +191,18 @@ class _HomeScreenState extends State<HomeScreen> {
               minWidth: 64,
               destinations: [
                 NavigationRailDestination(
-                  icon: const SizedBox.shrink(),
-                  selectedIcon: const SizedBox.shrink(),
+                  icon: const Icon(Icons.bolt_outlined),
+                  selectedIcon: const Icon(Icons.bolt),
                   label: Text(tr('nav_drops')),
                 ),
                 const NavigationRailDestination(
-                  icon: SizedBox.shrink(),
-                  selectedIcon: SizedBox.shrink(),
+                  icon: Icon(Icons.tune_outlined),
+                  selectedIcon: Icon(Icons.tune),
                   label: Text('Filtres'),
                 ),
                 NavigationRailDestination(
-                  icon: const SizedBox.shrink(),
-                  selectedIcon: const SizedBox.shrink(),
+                  icon: const Icon(Icons.settings_outlined),
+                  selectedIcon: const Icon(Icons.settings),
                   label: Text(tr('nav_settings')),
                 ),
               ],
@@ -279,44 +279,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
 // ── Logo ────────────────────────────────────────────────────────────────────
 
-// Thin, auto-dismissing banner shown at the top on state changes (e.g.
-// "changement vers <chaîne>…") so the user always sees *something happened*.
-class _StatusBanner extends StatelessWidget {
-  final String text;
-  const _StatusBanner({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return AnimatedContainer(
-      key: ValueKey(text),
-      duration: const Duration(milliseconds: 200),
-      width: double.infinity,
-      color: cs.secondaryContainer,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 14,
-            height: 14,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: cs.onSecondaryContainer,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(text,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: cs.onSecondaryContainer,
-                    )),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 
 // ── Top bar ─────────────────────────────────────────────────────────────────
 
@@ -362,7 +324,7 @@ class _TopBar extends StatelessWidget {
           IconButton(
             iconSize: 18,
             tooltip: tr('debug_logs'),
-            icon: const SizedBox.shrink(),
+            icon: const Icon(Icons.bug_report_outlined),
             onPressed: onOpenDebug,
           ),
           if (navIndex == 0)
@@ -378,7 +340,7 @@ class _TopBar extends StatelessWidget {
                 : IconButton(
                     iconSize: 18,
                     tooltip: tr('refresh_campaigns'),
-                    icon: const SizedBox.shrink(),
+                    icon: const Icon(Icons.refresh_outlined),
                     onPressed: onRefresh,
                   ),
         ],
@@ -388,6 +350,38 @@ class _TopBar extends StatelessWidget {
 }
 
 // ── Mining control bar ───────────────────────────────────────────────────────
+
+// Thin, auto-dismissing banner shown at the top on state changes (e.g.
+// "changement vers <chaîne>…") so something visibly happens.
+class _StatusBanner extends StatelessWidget {
+  final String text;
+  const _StatusBanner({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      key: ValueKey(text),
+      width: double.infinity,
+      color: cs.secondaryContainer,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2, color: cs.onSecondaryContainer),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(color: cs.onSecondaryContainer)),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _MiningControlBar extends StatefulWidget {
   final MiningService miningService;
@@ -468,7 +462,11 @@ class _MiningControlBarState extends State<_MiningControlBar> {
         children: [
           Row(
             children: [
-              SizedBox.shrink(),
+              Icon(
+                widget.autoMining ? Icons.auto_mode : Icons.touch_app_outlined,
+                size: 15,
+                color: cs.secondary,
+              ),
               const SizedBox(width: 6),
               Text(
                 widget.autoMining ? tr('auto_mining') : tr('manual_mining'),
@@ -505,17 +503,17 @@ class _MiningControlBarState extends State<_MiningControlBar> {
                 segments: const [
                   ButtonSegment(
                     value: CampaignViewMode.list,
-                    icon: SizedBox.shrink(),
+                    icon: Icon(Icons.view_list_outlined, size: 16),
                     tooltip: 'Liste',
                   ),
                   ButtonSegment(
                     value: CampaignViewMode.poster,
-                    icon: SizedBox.shrink(),
+                    icon: Icon(Icons.grid_view_outlined, size: 16),
                     tooltip: 'Affiches',
                   ),
                   ButtonSegment(
                     value: CampaignViewMode.compact,
-                    icon: SizedBox.shrink(),
+                    icon: Icon(Icons.table_rows_outlined, size: 16),
                     tooltip: 'Tableau compact',
                   ),
                 ],
@@ -528,14 +526,14 @@ class _MiningControlBarState extends State<_MiningControlBar> {
                 label: Text(tr('linked_only')),
                 selected: widget.linkedOnly,
                 onSelected: widget.onLinkedOnlyChanged,
-                avatar: SizedBox.shrink(),
+                avatar: Icon(widget.linkedOnly ? Icons.link : Icons.link_off, size: 14),
               ),
               const SizedBox(width: 4),
               IconButton(
                 visualDensity: VisualDensity.compact,
                 tooltip: tr('mining_details'),
                 iconSize: 18,
-                icon: SizedBox.shrink(),
+                icon: Icon(_detailsOpen ? Icons.expand_less : Icons.expand_more),
                 onPressed: () => setState(() => _detailsOpen = !_detailsOpen),
               ),
             ],
@@ -562,10 +560,6 @@ class _MiningControlBarState extends State<_MiningControlBar> {
   }
 }
 
-
-// Expandable details panel: websocket status, campaign/drop progress with
-// remaining time, and a list of live channels for the currently-mined game
-// (fetched on demand, only while the panel is open).
 class _MiningDetailsPanel extends StatefulWidget {
   final MiningService miningService;
   final List<DropCampaign> campaigns;
@@ -656,20 +650,16 @@ class _MiningDetailsPanelState extends State<_MiningDetailsPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Websocket status ─────────────────────────────────────
           Row(
             children: [
-              SizedBox.shrink(),
+              Icon(_socketConnected ? Icons.wifi : Icons.wifi_off,
+                  size: 14, color: _socketConnected ? cs.secondary : cs.error),
               const SizedBox(width: 6),
-              Text(
-                _socketConnected ? tr('socket_connected') : tr('socket_disconnected'),
-                style: tt.labelSmall,
-              ),
+              Text(_socketConnected ? tr('socket_connected') : tr('socket_disconnected'),
+                  style: tt.labelSmall),
             ],
           ),
           const SizedBox(height: 10),
-
-          // ── Campaign / drop progress ──────────────────────────────
           if (campaign != null) ...[
             Text(campaign.gameName, style: tt.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
             Text(campaign.name, style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
@@ -698,10 +688,7 @@ class _MiningDetailsPanelState extends State<_MiningDetailsPanel> {
             ],
           ] else
             Text(tr('nothing_mined'), style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-
           const SizedBox(height: 12),
-
-          // ── Live channels ──────────────────────────────────────────
           Row(
             children: [
               Text(tr('live_channels'), style: tt.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
@@ -726,14 +713,13 @@ class _MiningDetailsPanelState extends State<_MiningDetailsPanel> {
                     padding: const EdgeInsets.symmetric(vertical: 2),
                     child: Row(
                       children: [
-                        if (isActive) SizedBox.shrink()
+                        if (isActive) Icon(Icons.play_arrow, size: 12, color: cs.secondary)
                         else const SizedBox(width: 12),
                         const SizedBox(width: 4),
                         Expanded(child: Text(c.displayName,
-                            style: tt.labelSmall?.copyWith(
-                                fontWeight: isActive ? FontWeight.w700 : null),
+                            style: tt.labelSmall?.copyWith(fontWeight: isActive ? FontWeight.w700 : null),
                             overflow: TextOverflow.ellipsis)),
-                        SizedBox.shrink(),
+                        Icon(Icons.remove_red_eye_outlined, size: 12, color: cs.onSurfaceVariant),
                         const SizedBox(width: 4),
                         Text('${c.viewers}', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
                       ],
@@ -787,7 +773,7 @@ class _DropsTab extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox.shrink(),
+              Icon(Icons.cloud_off_outlined, size: 40, color: cs.error),
               const SizedBox(height: 12),
               Text(tr('failed_to_load'), style: tt.titleSmall),
               const SizedBox(height: 6),
@@ -797,7 +783,7 @@ class _DropsTab extends StatelessWidget {
               const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: onRefresh,
-                icon: const SizedBox.shrink(),
+                icon: const Icon(Icons.refresh, size: 16),
                 label: Text(tr('retry')),
               ),
             ],
@@ -813,7 +799,7 @@ class _DropsTab extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox.shrink(),
+              Icon(Icons.inbox_outlined, size: 40, color: cs.onSurfaceVariant),
               const SizedBox(height: 12),
               Text(tr('no_campaigns_title'), style: tt.titleSmall),
               const SizedBox(height: 6),
@@ -825,7 +811,7 @@ class _DropsTab extends StatelessWidget {
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: onRefresh,
-                icon: const SizedBox.shrink(),
+                icon: const Icon(Icons.refresh, size: 16),
                 label: Text(tr('check_again')),
               ),
             ],

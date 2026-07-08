@@ -44,6 +44,12 @@ class AppStrings {
     'theme_use_system_sub': "Match your device's accent color",
     'pick_color': 'Pick a color',
     'confirm': 'Confirm',
+    'sort_priority_only': 'Priority order only',
+    'mining_details': 'Mining details',
+    'socket_connected': 'Live updates connected',
+    'socket_disconnected': 'Live updates disconnected',
+    'nothing_mined': 'Nothing being mined right now',
+    'live_channels': 'Live channels',
     'connected_account': 'Connected account',
     'token_stored': 'Token stored',
     'not_connected': 'Not connected',
@@ -59,11 +65,6 @@ class AppStrings {
     'minimize_to_tray_sub': 'Keep mining in background when window is closed',
     'about': 'About',
     'source_code': 'Source code',
-    'mining_details': 'Mining details',
-    'socket_connected': 'Live updates connected',
-    'socket_disconnected': 'Live updates disconnected',
-    'nothing_mined': 'Nothing being mined right now',
-    'live_channels': 'Live channels',
   };
 
   static const Map<String, String> _fr = {
@@ -101,6 +102,12 @@ class AppStrings {
     'theme_use_system_sub': "Utiliser la couleur d'accentuation de l'appareil",
     'pick_color': 'Choisir une couleur',
     'confirm': 'Confirmer',
+    'sort_priority_only': "Ordre de priorité uniquement",
+    'mining_details': 'Détails du minage',
+    'socket_connected': 'Mises à jour en direct connectées',
+    'socket_disconnected': 'Mises à jour en direct déconnectées',
+    'nothing_mined': "Rien n'est miné pour le moment",
+    'live_channels': 'Chaînes en direct',
     'connected_account': 'Compte connecté',
     'token_stored': 'Jeton enregistré',
     'not_connected': 'Non connecté',
@@ -117,11 +124,6 @@ class AppStrings {
         "Continuer à miner en arrière-plan quand la fenêtre est fermée",
     'about': 'À propos',
     'source_code': 'Code source',
-    'mining_details': 'Détails du minage',
-    'socket_connected': 'Mises à jour en direct connectées',
-    'socket_disconnected': 'Mises à jour en direct déconnectées',
-    'nothing_mined': 'Rien n\'est miné pour le moment',
-    'live_channels': 'Chaînes en direct',
   };
 
   String t(String key) {

@@ -19,6 +19,10 @@ class TrayService with TrayListener, WindowListener {
   String? _miningGame;
   double? _miningProgress; // 0.0–1.0, current drop's progress
   bool _autoMiningEnabled = true;
+  // When false, the window close button quits the app instead of hiding it
+  // to the tray. Without this, a broken/invisible tray icon could leave
+  // the user with no way to quit at all.
+  bool minimizeToTrayEnabled = true;
 
   TrayService({
     required this.onShowWindow,
@@ -151,7 +155,15 @@ class TrayService with TrayListener, WindowListener {
 
   @override
   void onWindowClose() async {
-    await windowManager.hide();
+    if (minimizeToTrayEnabled) {
+      await windowManager.hide();
+    } else {
+      // User disabled "minimize to tray" — the close button must actually
+      // quit, or (especially with a broken/invisible tray icon) there'd be
+      // no way to exit the app at all.
+      await windowManager.setPreventClose(false);
+      await windowManager.close();
+    }
   }
 
   void dispose() {

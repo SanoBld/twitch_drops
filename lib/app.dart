@@ -22,9 +22,11 @@ class _AppState extends State<App> {
     _auth.load().then((_) => setState(() => _ready = true));
   }
 
-  // Seed color: either the OS accent color or a user-picked custom color,
-  // via ThemeSettings. Material 3 derives all other tones (secondary,
-  // tertiary, containers, etc.) from this one seed automatically.
+  // Single, coherent seed: the user's actual Windows accent color (falls
+  // back to Twitch purple on platforms where it isn't available). Material
+  // 3 derives ALL the other tones (secondary, tertiary, containers, etc.)
+  // from this one seed automatically, so nothing clashes — no more manually
+  // hand-picked colors fighting each other.
   Color get _seed => ThemeSettings().seed;
 
   ThemeData _buildTheme(Brightness brightness) {
@@ -60,7 +62,6 @@ class _AppState extends State<App> {
 
   @override
   Widget build(BuildContext context) {
-    // Rebuilds whenever the user changes the theme mode/color in Settings.
     return AnimatedBuilder(
       animation: ThemeSettings(),
       builder: (context, _) => MaterialApp(
@@ -69,8 +70,6 @@ class _AppState extends State<App> {
         themeMode: ThemeMode.system,
         theme: _buildTheme(Brightness.light),
         darkTheme: _buildTheme(Brightness.dark),
-        // Wraps every screen with a custom, in-app Windows title bar (drag
-        // area + minimize/maximize/close), replacing the native OS chrome.
         builder: (context, child) => Column(
           children: [
             const _CustomTitleBar(),
@@ -186,7 +185,7 @@ class _CustomTitleBarState extends State<_CustomTitleBar> with WindowListener {
           _TitleBarButton(
             icon: Icons.close,
             hoverColor: Colors.red,
-            tooltip: 'Fermer (réduit dans la barre des tâches)',
+            tooltip: 'Fermer',
             onPressed: () => windowManager.close(),
           ),
         ],

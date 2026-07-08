@@ -23,9 +23,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
   final _prioritySearchController = TextEditingController();
   String _priorityQuery = '';
 
-  // Computed on demand instead of cached once in initState: widget.campaigns
-  // is empty on first build (campaigns load async), so caching it there
-  // froze search on a permanently-empty list.
+  // Deduplicated list of (gameId -> gameName) across all campaigns.
   Map<String, String> get _games => {
         for (final c in widget.campaigns) c.gameId: c.gameName,
       };
@@ -120,6 +118,12 @@ class _FiltersScreenState extends State<FiltersScreen> {
                   groupValue: _sortMode,
                   onChanged: (v) => _saveSortMode(v!),
                 ),
+                RadioListTile<SortMode>(
+                  title: Text(tr('sort_priority_only')),
+                  value: SortMode.priorityOnly,
+                  groupValue: _sortMode,
+                  onChanged: (v) => _saveSortMode(v!),
+                ),
               ],
             ),
           ),
@@ -140,12 +144,12 @@ class _FiltersScreenState extends State<FiltersScreen> {
             controller: _prioritySearchController,
             decoration: InputDecoration(
               isDense: true,
-              prefixIcon: const SizedBox.shrink(),
+              prefixIcon: const Icon(Icons.search, size: 18),
               hintText: 'Rechercher un jeu…',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               suffixIcon: _priorityQuery.isNotEmpty
                   ? IconButton(
-                      icon: const SizedBox.shrink(),
+                      icon: const Icon(Icons.clear, size: 16),
                       onPressed: () {
                         _prioritySearchController.clear();
                         setState(() => _priorityQuery = '');
@@ -163,9 +167,6 @@ class _FiltersScreenState extends State<FiltersScreen> {
                     child: Text('—'),
                   )
                 : _priorityQuery.isNotEmpty
-                    // Filtered view: reordering is disabled while searching
-                    // (indices wouldn't map cleanly back to the full list),
-                    // but a tap moves the game straight to the top.
                     ? Column(
                         children: [
                           for (final id in _priorityOrder.where((id) =>
@@ -181,7 +182,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
                               ),
                               title: Text(_games[id] ?? id),
                               trailing: IconButton(
-                                icon: const SizedBox.shrink(),
+                                icon: const Icon(Icons.vertical_align_top, size: 18),
                                 tooltip: 'Mettre en premier',
                                 onPressed: () {
                                   setState(() {
@@ -215,7 +216,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
                                 style: const TextStyle(fontSize: 12)),
                           ),
                           title: Text(_games[_priorityOrder[i]] ?? _priorityOrder[i]),
-                          trailing: const SizedBox.shrink(),
+                          trailing: const Icon(Icons.drag_handle),
                         ),
                     ],
                   ),
@@ -237,12 +238,12 @@ class _FiltersScreenState extends State<FiltersScreen> {
             controller: _searchController,
             decoration: InputDecoration(
               isDense: true,
-              prefixIcon: const SizedBox.shrink(),
+              prefixIcon: const Icon(Icons.search, size: 18),
               hintText: 'Rechercher un jeu…',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               suffixIcon: _query.isNotEmpty
                   ? IconButton(
-                      icon: const SizedBox.shrink(),
+                      icon: const Icon(Icons.clear, size: 16),
                       onPressed: () {
                         _searchController.clear();
                         setState(() => _query = '');

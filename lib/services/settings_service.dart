@@ -1,7 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
-enum SortMode { expiringSoonest, mostViewers, alphabetical }
+enum SortMode { expiringSoonest, mostViewers, alphabetical, priorityOnly }
 
 class SettingsService {
   static const _priorityKey = 'priority_games';
@@ -85,7 +85,6 @@ class SettingsService {
     await prefs.setBool(_themeUseSystemKey, value);
   }
 
-  // Stored as 0xAARRGGBB int.
   Future<int?> loadCustomColor() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt(_themeCustomColorKey);

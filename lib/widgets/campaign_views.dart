@@ -119,7 +119,7 @@ class _PosterTileState extends State<_PosterTile> {
     _requestFallback();
     return Container(
       color: cs.surfaceContainerHighest,
-      child: SizedBox.shrink(),
+      child: Icon(Icons.videogame_asset_outlined, color: cs.onSurfaceVariant),
     );
   }
 
@@ -213,7 +213,8 @@ class _PosterTileState extends State<_PosterTile> {
                   Positioned(
                     top: 6,
                     left: 6,
-                    child: SizedBox.shrink(),
+                    child: Icon(Icons.link_off,
+                        size: 14, color: Colors.white.withValues(alpha: 0.85)),
                   ),
               ],
             ),
@@ -278,7 +279,7 @@ class CompactCampaignList extends StatelessWidget {
                   if (isActive)
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
-                      child: SizedBox.shrink(),
+                      child: Icon(Icons.bolt, size: 13, color: cs.secondary),
                     ),
                   Expanded(
                     flex: 3,
@@ -295,7 +296,7 @@ class CompactCampaignList extends StatelessWidget {
                         style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                   ),
                   if (!c.isAccountConnected)
-                    SizedBox.shrink(),
+                    Icon(Icons.link_off, size: 12, color: cs.error.withValues(alpha: 0.7)),
                   const SizedBox(width: 10),
                   SizedBox(
                     width: 70,
@@ -422,7 +423,7 @@ class _CampaignDetailsDialog extends StatelessWidget {
 class ChannelPickerDialog extends StatefulWidget {
   final DropCampaign campaign;
   final MiningService miningService;
-  const ChannelPickerDialog({required this.campaign, required this.miningService});
+  const ChannelPickerDialog({super.key, required this.campaign, required this.miningService});
 
   @override
   State<ChannelPickerDialog> createState() => ChannelPickerDialogState();
@@ -481,10 +482,9 @@ class ChannelPickerDialogState extends State<ChannelPickerDialog> {
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            SizedBox.shrink(),
+                            Icon(Icons.remove_red_eye_outlined, size: 14, color: cs.onSurfaceVariant),
                             const SizedBox(width: 4),
-                            Text('${c.viewers}',
-                                style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                            Text('${c.viewers}', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
                           ],
                         ),
                         onTap: () {

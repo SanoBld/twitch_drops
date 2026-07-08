@@ -232,9 +232,25 @@ class MiningService {
     }
   }
 
-  // Fetches the live channels list (with viewer counts) for whichever
-  // campaign is currently being mined, for on-demand display in the UI's
-  // details panel. Returns an empty list if nothing is being mined.
+  Future<List<Channel>> fetchLiveChannelsForActiveGame() async {
+    final ch = activeChannel;
+    if (ch == null) return [];
+    final campaign = _campaigns.cast<DropCampaign?>().firstWhere(
+          (c) => c?.gameId == ch.gameId,
+          orElse: () => null,
+        );
+    if (campaign == null || campaign.gameSlug.isEmpty) return [];
+    try {
+      final channels = await _channelService.fetchLiveChannels(
+          campaign.gameSlug, campaign.gameId, campaign.gameName);
+      channels.sort((a, b) => b.viewers.compareTo(a.viewers));
+      return channels;
+    } catch (e) {
+      _log.log('fetchLiveChannelsForActiveGame failed: $e', tag: 'MiningService');
+      return [];
+    }
+  }
+
   // Fetches live channels for ANY campaign (not just the active one), used
   // by the right-click "pick a channel" dialog.
   Future<List<Channel>> fetchLiveChannelsForCampaign(DropCampaign campaign) async {
@@ -262,25 +278,6 @@ class MiningService {
         tag: 'MiningService');
     _statusController.add(activeChannel);
     _ping();
-  }
-
-  Future<List<Channel>> fetchLiveChannelsForActiveGame() async {
-    final ch = activeChannel;
-    if (ch == null) return [];
-    final campaign = _campaigns.cast<DropCampaign?>().firstWhere(
-          (c) => c?.gameId == ch.gameId,
-          orElse: () => null,
-        );
-    if (campaign == null || campaign.gameSlug.isEmpty) return [];
-    try {
-      final channels = await _channelService.fetchLiveChannels(
-          campaign.gameSlug, campaign.gameId, campaign.gameName);
-      channels.sort((a, b) => b.viewers.compareTo(a.viewers));
-      return channels;
-    } catch (e) {
-      _log.log('fetchLiveChannelsForActiveGame failed: $e', tag: 'MiningService');
-      return [];
-    }
   }
 
   Future<void> _pickBestChannel() async {
@@ -325,6 +322,10 @@ class MiningService {
             return 0; // resolved after fetching live viewer counts below
           case SortMode.alphabetical:
             return a.gameName.toLowerCase().compareTo(b.gameName.toLowerCase());
+          case SortMode.priorityOnly:
+            // Already resolved by the priority ranking above; unranked
+            // games (both -1) keep their relative order.
+            return 0;
         }
       });
 

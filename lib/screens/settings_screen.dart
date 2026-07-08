@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../services/autostart_service.dart';
 import '../services/settings_service.dart';
 import '../services/theme_settings.dart';
+import '../main.dart' show trayService;
 import '../app_strings.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -93,7 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               children: [
                 SwitchListTile(
-                  secondary: const SizedBox.shrink(),
+                  secondary: const Icon(Icons.palette_outlined),
                   title: Text(tr('theme_use_system')),
                   subtitle: Text(tr('theme_use_system_sub')),
                   value: ThemeSettings().useSystem,
@@ -135,7 +136,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                SizedBox.shrink(),
+                Icon(Icons.language, size: 18, color: cs.onSurfaceVariant),
                 const SizedBox(width: 12),
                 Expanded(
                   child: SegmentedButton<String>(
@@ -160,7 +161,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             children: [
               ListTile(
-                leading: const SizedBox.shrink(),
+                leading: const Icon(Icons.account_circle_outlined),
                 title: Text(tr('connected_account')),
                 subtitle: Text(
                   widget.auth.token != null ? tr('token_stored') : tr('not_connected'),
@@ -169,7 +170,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const Divider(height: 1),
               ListTile(
-                leading: SizedBox.shrink(),
+                leading: Icon(Icons.logout, color: cs.error),
                 title: Text(tr('disconnect'), style: TextStyle(color: cs.error)),
                 onTap: () async {
                   final ok = await showDialog<bool>(
@@ -208,7 +209,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             children: [
               SwitchListTile(
-                secondary: const SizedBox.shrink(),
+                secondary: const Icon(Icons.rocket_launch_outlined),
                 title: Text(tr('start_with_system')),
                 subtitle: Text(tr('start_with_system_sub')),
                 value: _autostartEnabled,
@@ -223,12 +224,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const Divider(height: 1),
               SwitchListTile(
-                secondary: const SizedBox.shrink(),
+                secondary: const Icon(Icons.minimize_outlined),
                 title: Text(tr('minimize_to_tray')),
                 subtitle: Text(tr('minimize_to_tray_sub')),
                 value: _minimizeToTray,
                 onChanged: (v) async {
                   await _settings.setMinimizeToTray(v);
+                  trayService.minimizeToTrayEnabled = v;
                   setState(() => _minimizeToTray = v);
                 },
               ),
@@ -244,16 +246,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             children: [
               ListTile(
-                leading: const SizedBox.shrink(),
+                leading: const Icon(Icons.info_outline),
                 title: const Text('Twitch Drops Miner'),
                 subtitle: Text('Version $_version'),
               ),
               const Divider(height: 1),
               ListTile(
-                leading: const SizedBox.shrink(),
+                leading: const Icon(Icons.code_outlined),
                 title: Text(tr('source_code')),
                 subtitle: const Text('github.com/SanoBld/twitch_drops'),
-                trailing: const SizedBox.shrink(),
+                trailing: const Icon(Icons.open_in_new, size: 16),
                 onTap: () {},
               ),
             ],
@@ -266,23 +268,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 const _presetColors = [
-  Colors.deepPurple,
-  Colors.indigo,
-  Colors.blue,
-  Colors.teal,
-  Colors.green,
-  Colors.amber,
-  Colors.deepOrange,
-  Colors.red,
-  Colors.pink,
+  Colors.deepPurple, Colors.indigo, Colors.blue, Colors.teal,
+  Colors.green, Colors.amber, Colors.deepOrange, Colors.red, Colors.pink,
 ];
 
 class _ColorSwatch extends StatelessWidget {
   final Color color;
   final bool selected;
   final VoidCallback onTap;
-  const _ColorSwatch(
-      {required this.color, required this.selected, required this.onTap});
+  const _ColorSwatch({required this.color, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -298,14 +292,12 @@ class _ColorSwatch extends StatelessWidget {
               ? Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2)
               : null,
         ),
-        child: selected ? const SizedBox.shrink() : null,
+        child: selected ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
       ),
     );
   }
 }
 
-// Opens a simple HSV color picker dialog (hue slider + shade grid) so the
-// user can pick ANY color, not just the presets.
 class _CustomColorButton extends StatelessWidget {
   final Color current;
   final ValueChanged<Color> onPicked;
@@ -331,7 +323,7 @@ class _CustomColorButton extends StatelessWidget {
             colors: [Colors.red, Colors.yellow, Colors.green, Colors.cyan, Colors.blue, Colors.purple, Colors.red],
           ),
         ),
-        child: const SizedBox.shrink(),
+        child: const Icon(Icons.add, size: 16, color: Colors.white),
       ),
     );
   }
@@ -358,11 +350,8 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(color: preview, shape: BoxShape.circle),
-            ),
+            Container(width: 60, height: 60,
+                decoration: BoxDecoration(color: preview, shape: BoxShape.circle)),
             const SizedBox(height: 16),
             SliderTheme(
               data: SliderThemeData(
@@ -370,9 +359,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
               ),
               child: Slider(
-                value: _hue,
-                min: 0,
-                max: 360,
+                value: _hue, min: 0, max: 360,
                 activeColor: preview,
                 onChanged: (v) => setState(() => _hue = v),
               ),
@@ -381,14 +368,8 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(tr('cancel')),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, preview),
-          child: Text(tr('confirm')),
-        ),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('cancel'))),
+        FilledButton(onPressed: () => Navigator.pop(context, preview), child: Text(tr('confirm'))),
       ],
     );
   }
