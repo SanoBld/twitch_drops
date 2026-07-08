@@ -27,9 +27,12 @@ void main() async {
     titleBarStyle: TitleBarStyle.hidden,
   );
   await windowManager.waitUntilReadyToShow(windowOptions, () async {
-    // WindowOptions.titleBarStyle alone doesn't always suppress native
-    // caption buttons on Windows — this forces it, fixing the double
-    // titlebar (native gray bar showing above our custom one).
+    // On Windows, WindowOptions.titleBarStyle alone can leave a thin
+    // native gray strip with the OS's own caption buttons rendered above
+    // our custom title bar (a "double titlebar"). Explicitly forcing
+    // frameless + hidden-with-no-buttons removes the native frame
+    // entirely so only our Flutter-drawn bar remains.
+    await windowManager.setAsFrameless();
     await windowManager.setTitleBarStyle(TitleBarStyle.hidden,
         windowButtonVisibility: false);
     await windowManager.show();
