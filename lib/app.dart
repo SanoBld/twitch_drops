@@ -155,9 +155,7 @@ class _CustomTitleBarState extends State<_CustomTitleBar> with WindowListener {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Image.asset('assets/logo.png', width: 15, height: 15,
-                        errorBuilder: (_, __, ___) =>
-                            Icon(Icons.bolt, size: 15, color: cs.primary)),
+                    Icon(Icons.bolt, size: 15, color: cs.primary),
                     const SizedBox(width: 6),
                     Text(
                       'Twitch Drops Miner',
