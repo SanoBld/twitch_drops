@@ -412,7 +412,6 @@ class _MiningControlBar extends StatefulWidget {
 
 class _MiningControlBarState extends State<_MiningControlBar> {
   Timer? _ticker;
-  bool _detailsOpen = false;
 
   @override
   void initState() {
@@ -528,14 +527,6 @@ class _MiningControlBarState extends State<_MiningControlBar> {
                 onSelected: widget.onLinkedOnlyChanged,
                 avatar: Icon(widget.linkedOnly ? Icons.link : Icons.link_off, size: 14),
               ),
-              const SizedBox(width: 4),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                tooltip: tr('mining_details'),
-                iconSize: 18,
-                icon: Icon(_detailsOpen ? Icons.expand_less : Icons.expand_more),
-                onPressed: () => setState(() => _detailsOpen = !_detailsOpen),
-              ),
             ],
           ),
           if (widget.activeChannel != null && sessionDuration != null)
@@ -548,191 +539,12 @@ class _MiningControlBarState extends State<_MiningControlBar> {
                 style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
               ),
             ),
-          if (_detailsOpen)
-            _MiningDetailsPanel(
-              miningService: widget.miningService,
-              campaigns: widget.campaigns,
-              activeChannel: widget.activeChannel,
-            ),
         ],
       ),
     );
   }
 }
 
-class _MiningDetailsPanel extends StatefulWidget {
-  final MiningService miningService;
-  final List<DropCampaign> campaigns;
-  final Channel? activeChannel;
-
-  const _MiningDetailsPanel({
-    required this.miningService,
-    required this.campaigns,
-    required this.activeChannel,
-  });
-
-  @override
-  State<_MiningDetailsPanel> createState() => _MiningDetailsPanelState();
-}
-
-class _MiningDetailsPanelState extends State<_MiningDetailsPanel> {
-  List<Channel>? _channels;
-  bool _loadingChannels = false;
-  StreamSubscription<bool>? _sub;
-  bool _socketConnected = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _socketConnected = widget.miningService.socketConnected;
-    _sub = widget.miningService.onSocketConnectionChanged.listen((v) {
-      if (mounted) setState(() => _socketConnected = v);
-    });
-    _loadChannels();
-  }
-
-  @override
-  void didUpdateWidget(covariant _MiningDetailsPanel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.activeChannel?.gameId != widget.activeChannel?.gameId) {
-      _loadChannels();
-    }
-  }
-
-  @override
-  void dispose() {
-    _sub?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _loadChannels() async {
-    setState(() => _loadingChannels = true);
-    final list = await widget.miningService.fetchLiveChannelsForActiveGame();
-    if (mounted) setState(() {
-      _channels = list;
-      _loadingChannels = false;
-    });
-  }
-
-  String _fmtRemaining(Duration d) {
-    if (d.inMinutes <= 0) return '0m';
-    final h = d.inHours;
-    final m = d.inMinutes % 60;
-    return h > 0 ? '${h}h${m.toString().padLeft(2, '0')}' : '${m}m';
-  }
-
-  DropCampaign? get _activeCampaign {
-    final ch = widget.activeChannel;
-    if (ch == null) return null;
-    for (final c in widget.campaigns) {
-      if (c.gameId == ch.gameId) return c;
-    }
-    return null;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    final campaign = _activeCampaign;
-    final drop = campaign?.drops.where((d) => !d.claimed).cast<TimeBasedDrop?>().firstWhere(
-          (d) => d != null,
-          orElse: () => null,
-        );
-
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(_socketConnected ? Icons.wifi : Icons.wifi_off,
-                  size: 14, color: _socketConnected ? cs.secondary : cs.error),
-              const SizedBox(width: 6),
-              Text(_socketConnected ? tr('socket_connected') : tr('socket_disconnected'),
-                  style: tt.labelSmall),
-            ],
-          ),
-          const SizedBox(height: 10),
-          if (campaign != null) ...[
-            Text(campaign.gameName, style: tt.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
-            Text(campaign.name, style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-            if (drop != null) ...[
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(child: Text(drop.name, style: tt.labelSmall)),
-                  Text(
-                    '${(drop.progress * 100).toStringAsFixed(0)}% · '
-                    '${_fmtRemaining(Duration(minutes: drop.remainingMinutes))} restantes',
-                    style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: drop.progress,
-                  minHeight: 6,
-                  backgroundColor: cs.surfaceContainerHighest,
-                  valueColor: AlwaysStoppedAnimation(cs.secondary),
-                ),
-              ),
-            ],
-          ] else
-            Text(tr('nothing_mined'), style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Text(tr('live_channels'), style: tt.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
-              const SizedBox(width: 8),
-              if (_loadingChannels)
-                const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          if (!_loadingChannels && (_channels == null || _channels!.isEmpty))
-            Text('—', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant))
-          else
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 160),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _channels?.length ?? 0,
-                itemBuilder: (_, i) {
-                  final c = _channels![i];
-                  final isActive = widget.activeChannel?.broadcastId == c.broadcastId;
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      children: [
-                        if (isActive) Icon(Icons.play_arrow, size: 12, color: cs.secondary)
-                        else const SizedBox(width: 12),
-                        const SizedBox(width: 4),
-                        Expanded(child: Text(c.displayName,
-                            style: tt.labelSmall?.copyWith(fontWeight: isActive ? FontWeight.w700 : null),
-                            overflow: TextOverflow.ellipsis)),
-                        Icon(Icons.remove_red_eye_outlined, size: 12, color: cs.onSurfaceVariant),
-                        const SizedBox(width: 4),
-                        Text('${c.viewers}', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
 
 // ── Drops tab ────────────────────────────────────────────────────────────────
 
@@ -820,6 +632,29 @@ class _DropsTab extends StatelessWidget {
       );
     }
 
+    final activeCampaign = activeChannel == null
+        ? null
+        : campaigns.cast<DropCampaign?>().firstWhere(
+            (c) => c?.gameId == activeChannel!.gameId,
+            orElse: () => null,
+          );
+    final restCampaigns =
+        activeCampaign == null ? campaigns : campaigns.where((c) => c.id != activeCampaign.id).toList();
+
+    return Column(
+      children: [
+        if (activeCampaign != null)
+          _ActiveCampaignHero(
+            campaign: activeCampaign,
+            activeChannel: activeChannel!,
+            miningService: miningService,
+          ),
+        Expanded(child: _buildCampaignsView(context, restCampaigns)),
+      ],
+    );
+  }
+
+  Widget _buildCampaignsView(BuildContext context, List<DropCampaign> campaigns) {
     switch (viewMode) {
       case CampaignViewMode.poster:
         return PosterCampaignGrid(
@@ -875,6 +710,240 @@ class _DropsTab extends StatelessWidget {
           ),
         );
     }
+  }
+}
+
+// Pinned card for the campaign currently being mined: game on the left,
+// full details (drops with progress + reward image, live channels with
+// viewer counts, a channel-picker button) on the right — or stacked below
+// on narrow windows.
+class _ActiveCampaignHero extends StatefulWidget {
+  final DropCampaign campaign;
+  final Channel activeChannel;
+  final MiningService miningService;
+
+  const _ActiveCampaignHero({
+    required this.campaign,
+    required this.activeChannel,
+    required this.miningService,
+  });
+
+  @override
+  State<_ActiveCampaignHero> createState() => _ActiveCampaignHeroState();
+}
+
+class _ActiveCampaignHeroState extends State<_ActiveCampaignHero> {
+  List<Channel>? _channels;
+  bool _loadingChannels = false;
+  StreamSubscription<bool>? _sub;
+  bool _socketConnected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _socketConnected = widget.miningService.socketConnected;
+    _sub = widget.miningService.onSocketConnectionChanged.listen((v) {
+      if (mounted) setState(() => _socketConnected = v);
+    });
+    _loadChannels();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ActiveCampaignHero old) {
+    super.didUpdateWidget(old);
+    if (old.campaign.id != widget.campaign.id) _loadChannels();
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadChannels() async {
+    setState(() => _loadingChannels = true);
+    final list = await widget.miningService.fetchLiveChannelsForCampaign(widget.campaign);
+    if (mounted) setState(() {
+      _channels = list;
+      _loadingChannels = false;
+    });
+  }
+
+  String _fmtRemaining(Duration d) {
+    if (d.inMinutes <= 0) return '0m';
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
+    return h > 0 ? '${h}h${m.toString().padLeft(2, '0')}' : '${m}m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final campaign = widget.campaign;
+
+    final left = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            _PulsingDotSmall(color: cs.secondary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(campaign.gameName,
+                  style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+        Text(campaign.name, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+        const SizedBox(height: 10),
+        if (campaign.boxArtUrl.isNotEmpty)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(campaign.boxArtUrl, width: 90, height: 120, fit: BoxFit.cover),
+          ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(_socketConnected ? Icons.wifi : Icons.wifi_off,
+                size: 13, color: _socketConnected ? cs.secondary : cs.error),
+            const SizedBox(width: 5),
+            Text(_socketConnected ? tr('socket_connected') : tr('socket_disconnected'),
+                style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text('${widget.activeChannel.displayName} · ${widget.activeChannel.viewers} viewers',
+            style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+      ],
+    );
+
+    final right = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final d in campaign.drops) ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (d.imageUrl.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.network(d.imageUrl, width: 36, height: 36, fit: BoxFit.cover),
+                ),
+              if (d.imageUrl.isNotEmpty) const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: Text(d.name, style: tt.bodySmall)),
+                        if (d.claimed)
+                          Text('Récupéré', style: tt.labelSmall?.copyWith(color: cs.secondary))
+                        else
+                          Text(
+                            '${(d.progress * 100).toStringAsFixed(0)}% · '
+                            '${_fmtRemaining(Duration(minutes: d.remainingMinutes))} restantes',
+                            style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: d.claimed ? 1 : d.progress,
+                        minHeight: 5,
+                        backgroundColor: cs.surfaceContainerHighest,
+                        valueColor: AlwaysStoppedAnimation(cs.secondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+        ],
+        Row(
+          children: [
+            Text(tr('live_channels'), style: tt.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(width: 8),
+            if (_loadingChannels)
+              const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+            const Spacer(),
+            TextButton(
+              onPressed: () => showDialog(
+                context: context,
+                builder: (_) => ChannelPickerDialog(campaign: campaign, miningService: widget.miningService),
+              ),
+              child: const Text('Changer de chaîne'),
+            ),
+          ],
+        ),
+        if (!_loadingChannels && (_channels == null || _channels!.isEmpty))
+          Text('—', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant))
+        else
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 150),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _channels?.length ?? 0,
+              itemBuilder: (_, i) {
+                final c = _channels![i];
+                final isActive = widget.activeChannel.broadcastId == c.broadcastId;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      if (isActive) Icon(Icons.play_arrow, size: 12, color: cs.secondary)
+                      else const SizedBox(width: 12),
+                      const SizedBox(width: 4),
+                      Expanded(child: Text(c.displayName,
+                          style: tt.labelSmall?.copyWith(fontWeight: isActive ? FontWeight.w700 : null),
+                          overflow: TextOverflow.ellipsis)),
+                      Icon(Icons.remove_red_eye_outlined, size: 12, color: cs.onSurfaceVariant),
+                      const SizedBox(width: 4),
+                      Text('${c.viewers}', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.secondaryContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.secondary, width: 1.2),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 640) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [left, const SizedBox(height: 16), right],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(width: 200, child: left),
+              const SizedBox(width: 20),
+              Expanded(child: right),
+            ],
+          );
+        },
+      ),
+    );
   }
 }
 

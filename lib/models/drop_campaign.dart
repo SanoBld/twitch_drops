@@ -87,6 +87,7 @@ class TimeBasedDrop {
   final int requiredMinutes;
   int currentMinutes;
   bool claimed;
+  final String imageUrl;
 
   TimeBasedDrop({
     required this.id,
@@ -94,18 +95,27 @@ class TimeBasedDrop {
     required this.requiredMinutes,
     this.currentMinutes = 0,
     this.claimed = false,
+    this.imageUrl = '',
   });
 
   factory TimeBasedDrop.fromJson(Map<String, dynamic> j) {
     // Progress lives under 'self' object
     final rawSelf = j['self'] ?? j['userDropInventory'];
     final self = rawSelf == null ? <String, dynamic>{} : Map<String, dynamic>.from(rawSelf as Map);
+    // Reward image, when present, lives under benefitEdges[0].benefit.imageAssetURL
+    final benefitEdges = j['benefitEdges'] as List?;
+    String imageUrl = '';
+    if (benefitEdges != null && benefitEdges.isNotEmpty) {
+      final benefit = (benefitEdges.first as Map)['benefit'] as Map?;
+      imageUrl = benefit?['imageAssetURL']?.toString() ?? '';
+    }
     return TimeBasedDrop(
       id: j['id'] ?? '',
       name: j['name'] ?? '',
       requiredMinutes: j['requiredMinutesWatched'] ?? j['requiredMinutes'] ?? 0,
       currentMinutes: self['currentMinutesWatched'] ?? self['currentMinutes'] ?? 0,
       claimed: self['isClaimed'] ?? self['claimed'] ?? false,
+      imageUrl: imageUrl,
     );
   }
 
