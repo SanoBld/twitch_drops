@@ -35,6 +35,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<String> _priority = [];
   String _version = '';
   String _language = 'fr';
+  bool _notifyEmailEnabled = false;
+  String _notifyEmailAddress = '';
+  final _emailController = TextEditingController();
   bool _loading = true;
 
   @override
@@ -50,6 +53,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _settings.loadPriority(),
       PackageInfo.fromPlatform().then((i) => '${i.version}+${i.buildNumber}'),
       _settings.loadLanguage(),
+      _settings.loadNotifyEmailEnabled(),
+      _settings.loadNotifyEmailAddress(),
     ]);
     setState(() {
       _autostartEnabled = results[0] as bool;
@@ -57,8 +62,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _priority = results[2] as List<String>;
       _version = results[3] as String;
       _language = results[4] as String;
+      _notifyEmailEnabled = results[5] as bool;
+      _notifyEmailAddress = results[6] as String;
+      _emailController.text = _notifyEmailAddress;
       _loading = false;
     });
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
   }
 
   Future<void> _setLanguage(String code) async {
@@ -204,6 +218,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 20),
 
         // ── Behavior ─────────────────────────────────────────────────
+        // ── Notifications ────────────────────────────────────────────
+        _SectionHeader(title: tr('notifications')),
+        Card(
+          child: Column(
+            children: [
+              SwitchListTile(
+                secondary: const Icon(Icons.mail_outline),
+                title: Text(tr('notify_email')),
+                subtitle: Text(tr('notify_email_sub')),
+                value: _notifyEmailEnabled,
+                onChanged: (v) async {
+                  await _settings.saveNotifyEmailEnabled(v);
+                  setState(() => _notifyEmailEnabled = v);
+                },
+              ),
+              if (_notifyEmailEnabled) ...[
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: TextField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      labelText: tr('notify_email_address'),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onChanged: (v) => _notifyEmailAddress = v,
+                    onEditingComplete: () => _settings.saveNotifyEmailAddress(_notifyEmailAddress),
+                    onSubmitted: (v) => _settings.saveNotifyEmailAddress(v),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
         _SectionHeader(title: tr('behavior')),
         Card(
           child: Column(

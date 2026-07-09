@@ -94,4 +94,28 @@ class SettingsService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_themeCustomColorKey, argb);
   }
+
+  // ── Email notifications (drop claimed) ────────────────────────────
+  static const _notifyEmailEnabledKey = 'notify_email_enabled';
+  static const _notifyEmailAddressKey = 'notify_email_address';
+
+  Future<bool> loadNotifyEmailEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_notifyEmailEnabledKey) ?? false;
+  }
+
+  Future<void> saveNotifyEmailEnabled(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_notifyEmailEnabledKey, value);
+  }
+
+  Future<String> loadNotifyEmailAddress() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_notifyEmailAddressKey) ?? '';
+  }
+
+  Future<void> saveNotifyEmailAddress(String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_notifyEmailAddressKey, value);
+  }
 }

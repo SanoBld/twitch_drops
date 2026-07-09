@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/channel.dart';
 import '../models/drop_campaign.dart';
 import 'gql_service.dart';
@@ -132,6 +133,7 @@ class MiningService {
       _log.log('Drop $dropId is ready to claim (per Twitch) — claiming automatically',
           tag: 'MiningService');
       _updateDropProgress(dropId, claimed: true);
+      _notifyDropClaimed(dropId);
       if (dropInstanceId != null) {
         gql.claimDropReward(dropInstanceId).then((ok) {
           _log.log(
@@ -143,6 +145,37 @@ class MiningService {
           );
         });
       }
+    }
+  }
+
+  // Opens the user's default mail client with a pre-filled draft when a
+  // drop is claimed, if enabled in Settings. Actually sending requires the
+  // user's own mail client (no SMTP server is configured on their behalf).
+  Future<void> _notifyDropClaimed(String dropId) async {
+    final enabled = await _settings.loadNotifyEmailEnabled();
+    if (!enabled) return;
+    final address = await _settings.loadNotifyEmailAddress();
+    if (address.isEmpty) return;
+    DropCampaign? campaign;
+    String dropName = dropId;
+    for (final c in _campaigns) {
+      for (final d in c.drops) {
+        if (d.id == dropId) {
+          campaign = c;
+          dropName = d.name;
+        }
+      }
+    }
+    final subject = Uri.encodeComponent('Drop récupéré : $dropName');
+    final body = Uri.encodeComponent(
+      'Le drop "$dropName" a été récupéré'
+      '${campaign != null ? ' pour ${campaign.gameName} (${campaign.name})' : ''}.',
+    );
+    final uri = Uri.parse('mailto:$address?subject=$subject&body=$body');
+    try {
+      await launchUrl(uri);
+    } catch (e) {
+      _log.log('Email notification failed to open: $e', tag: 'MiningService');
     }
   }
 

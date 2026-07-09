@@ -648,6 +648,7 @@ class _DropsTab extends StatelessWidget {
             campaign: activeCampaign,
             activeChannel: activeChannel!,
             miningService: miningService,
+            totalCampaigns: campaigns.length,
           ),
         Expanded(child: _buildCampaignsView(context, restCampaigns)),
       ],
@@ -721,11 +722,13 @@ class _ActiveCampaignHero extends StatefulWidget {
   final DropCampaign campaign;
   final Channel activeChannel;
   final MiningService miningService;
+  final int totalCampaigns;
 
   const _ActiveCampaignHero({
     required this.campaign,
     required this.activeChannel,
     required this.miningService,
+    required this.totalCampaigns,
   });
 
   @override
@@ -737,6 +740,7 @@ class _ActiveCampaignHeroState extends State<_ActiveCampaignHero> {
   bool _loadingChannels = false;
   StreamSubscription<bool>? _sub;
   bool _socketConnected = false;
+  bool _expanded = false;
 
   @override
   void initState() {
@@ -782,58 +786,60 @@ class _ActiveCampaignHeroState extends State<_ActiveCampaignHero> {
     final tt = Theme.of(context).textTheme;
     final campaign = widget.campaign;
 
-    final left = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+    final header = Row(
       children: [
-        Row(
-          children: [
-            _PulsingDotSmall(color: cs.secondary),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(campaign.gameName,
-                  style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-            ),
-          ],
-        ),
-        Text(campaign.name, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-        const SizedBox(height: 10),
         if (campaign.boxArtUrl.isNotEmpty)
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.network(campaign.boxArtUrl, width: 90, height: 120, fit: BoxFit.cover),
+            child: Image.network(campaign.boxArtUrl, width: 44, height: 58, fit: BoxFit.cover),
           ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(_socketConnected ? Icons.wifi : Icons.wifi_off,
-                size: 13, color: _socketConnected ? cs.secondary : cs.error),
-            const SizedBox(width: 5),
-            Text(_socketConnected ? tr('socket_connected') : tr('socket_disconnected'),
-                style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-          ],
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  _PulsingDotSmall(color: cs.secondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(campaign.gameName,
+                        style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  ),
+                ],
+              ),
+              Text(campaign.name, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+              Text('${widget.activeChannel.displayName} · ${widget.activeChannel.viewers} viewers',
+                  style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+            ],
+          ),
         ),
-        const SizedBox(height: 4),
-        Text('${widget.activeChannel.displayName} · ${widget.activeChannel.viewers} viewers',
-            style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+        IconButton(
+          tooltip: _expanded ? 'Réduire' : "Voir tous les drops et l'état",
+          icon: Icon(_expanded ? Icons.remove_circle_outline : Icons.add_circle_outline),
+          onPressed: () => setState(() => _expanded = !_expanded),
+        ),
       ],
     );
 
-    final right = Column(
+    final drops = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        Text('Drops disponibles', style: tt.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
         for (final d in campaign.drops) ...[
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (d.imageUrl.isNotEmpty)
+              if (d.imageUrl.isNotEmpty) ...[
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: Image.network(d.imageUrl, width: 36, height: 36, fit: BoxFit.cover),
                 ),
-              if (d.imageUrl.isNotEmpty) const SizedBox(width: 10),
+                const SizedBox(width: 10),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -868,6 +874,29 @@ class _ActiveCampaignHeroState extends State<_ActiveCampaignHero> {
           ),
           const SizedBox(height: 10),
         ],
+      ],
+    );
+
+    final status = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(_socketConnected ? Icons.wifi : Icons.wifi_off,
+            size: 13, color: _socketConnected ? cs.secondary : cs.error),
+        const SizedBox(width: 5),
+        Text(_socketConnected ? tr('socket_connected') : tr('socket_disconnected'),
+            style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+        const SizedBox(width: 14),
+        Icon(Icons.inventory_2_outlined, size: 13, color: cs.onSurfaceVariant),
+        const SizedBox(width: 5),
+        Text('${widget.totalCampaigns} campagnes chargées',
+            style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+      ],
+    );
+
+    final channelsSection = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
         Row(
           children: [
             Text(tr('live_channels'), style: tt.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
@@ -887,61 +916,64 @@ class _ActiveCampaignHeroState extends State<_ActiveCampaignHero> {
         if (!_loadingChannels && (_channels == null || _channels!.isEmpty))
           Text('—', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant))
         else
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 150),
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: _channels?.length ?? 0,
-              itemBuilder: (_, i) {
-                final c = _channels![i];
-                final isActive = widget.activeChannel.broadcastId == c.broadcastId;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Row(
-                    children: [
-                      if (isActive) Icon(Icons.play_arrow, size: 12, color: cs.secondary)
-                      else const SizedBox(width: 12),
-                      const SizedBox(width: 4),
-                      Expanded(child: Text(c.displayName,
-                          style: tt.labelSmall?.copyWith(fontWeight: isActive ? FontWeight.w700 : null),
-                          overflow: TextOverflow.ellipsis)),
-                      Icon(Icons.remove_red_eye_outlined, size: 12, color: cs.onSurfaceVariant),
-                      const SizedBox(width: 4),
-                      Text('${c.viewers}', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-                    ],
-                  ),
-                );
-              },
-            ),
+          Wrap(
+            spacing: 16,
+            runSpacing: 4,
+            children: [
+              for (final c in (_channels ?? []))
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.activeChannel.broadcastId == c.broadcastId)
+                      Icon(Icons.play_arrow, size: 12, color: cs.secondary),
+                    const SizedBox(width: 2),
+                    Text(c.displayName,
+                        style: tt.labelSmall?.copyWith(
+                            fontWeight: widget.activeChannel.broadcastId == c.broadcastId
+                                ? FontWeight.w700
+                                : null)),
+                    const SizedBox(width: 4),
+                    Icon(Icons.remove_red_eye_outlined, size: 11, color: cs.onSurfaceVariant),
+                    const SizedBox(width: 2),
+                    Text('${c.viewers}', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                  ],
+                ),
+            ],
           ),
       ],
     );
 
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 10, 14, 4),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: cs.secondaryContainer.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: cs.secondary, width: 1.2),
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth < 640) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [left, const SizedBox(height: 16), right],
-            );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(width: 200, child: left),
-              const SizedBox(width: 20),
-              Expanded(child: right),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        alignment: Alignment.topCenter,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            header,
+            if (_expanded) ...[
+              const SizedBox(height: 14),
+              status,
+              const SizedBox(height: 14),
+              LayoutBuilder(
+                builder: (context, constraints) => constraints.maxWidth < 560
+                    ? drops
+                    : Align(alignment: Alignment.topLeft, child: drops),
+              ),
+              const SizedBox(height: 14),
+              channelsSection,
             ],
-          );
-        },
+          ],
+        ),
       ),
     );
   }
