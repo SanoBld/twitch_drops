@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:window_manager/window_manager.dart';
 import 'services/auth_service.dart';
 import 'services/theme_settings.dart';
 import 'screens/login_screen.dart';
@@ -73,12 +72,6 @@ class _AppState extends State<App> {
         // Android-style "stretch" effect instead of iOS's rubber-band
         // bounce when a list is scrolled past its start/end.
         scrollBehavior: _AppScrollBehavior(),
-        builder: (context, child) => Column(
-          children: [
-            const _CustomTitleBar(),
-            Expanded(child: child ?? const SizedBox()),
-          ],
-        ),
         home: !_ready
             ? const Scaffold(body: Center(child: CircularProgressIndicator()))
             : _auth.isLoggedIn
@@ -122,143 +115,4 @@ class _AppScrollBehavior extends MaterialScrollBehavior {
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) =>
       const ClampingScrollPhysics();
-}
-
-// A minimal custom title bar replacing the native Windows one: draggable
-// area with the app name, plus minimize / maximize-restore / close buttons
-// styled to match the app's theme instead of stock OS chrome.
-class _CustomTitleBar extends StatefulWidget {
-  const _CustomTitleBar();
-
-  @override
-  State<_CustomTitleBar> createState() => _CustomTitleBarState();
-}
-
-class _CustomTitleBarState extends State<_CustomTitleBar> with WindowListener {
-  bool _isMaximized = false;
-
-  @override
-  void initState() {
-    super.initState();
-    windowManager.addListener(this);
-    windowManager.isMaximized().then((v) {
-      if (mounted) setState(() => _isMaximized = v);
-    });
-  }
-
-  @override
-  void dispose() {
-    windowManager.removeListener(this);
-    super.dispose();
-  }
-
-  @override
-  void onWindowMaximize() => setState(() => _isMaximized = true);
-
-  @override
-  void onWindowUnmaximize() => setState(() => _isMaximized = false);
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      height: 32,
-      color: cs.surface,
-      child: Row(
-        children: [
-          Expanded(
-            child: DragToMoveArea(
-              child: Container(
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.only(left: 12),
-                child: Text(
-                  'Twitch Drops Miner',
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                ),
-              ),
-            ),
-          ),
-          _TitleBarButton(
-            icon: Icons.remove,
-            tooltip: 'Réduire',
-            onPressed: () => windowManager.minimize(),
-          ),
-          _TitleBarButton(
-            icon: _isMaximized ? Icons.filter_none : Icons.crop_square,
-            iconSize: _isMaximized ? 13 : 14,
-            tooltip: _isMaximized ? 'Restaurer' : 'Agrandir',
-            onPressed: () async {
-              if (await windowManager.isMaximized()) {
-                windowManager.unmaximize();
-              } else {
-                windowManager.maximize();
-              }
-            },
-          ),
-          _TitleBarButton(
-            icon: Icons.close,
-            hoverColor: Colors.red,
-            tooltip: 'Fermer',
-            onPressed: () => windowManager.close(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TitleBarButton extends StatefulWidget {
-  final IconData icon;
-  final double iconSize;
-  final Color? hoverColor;
-  final VoidCallback onPressed;
-  final String? tooltip;
-
-  const _TitleBarButton({
-    required this.icon,
-    required this.onPressed,
-    this.iconSize = 15,
-    this.hoverColor,
-    this.tooltip,
-  });
-
-  @override
-  State<_TitleBarButton> createState() => _TitleBarButtonState();
-}
-
-class _TitleBarButtonState extends State<_TitleBarButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final bg = widget.hoverColor ?? cs.surfaceContainerHighest;
-    return Tooltip(
-      message: widget.tooltip ?? '',
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: widget.onPressed,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 120),
-            width: 46,
-            height: 32,
-            color: _hovered ? bg : Colors.transparent,
-            alignment: Alignment.center,
-            child: Icon(
-              widget.icon,
-              size: widget.iconSize,
-              color: _hovered && widget.hoverColor != null
-                  ? Colors.white
-                  : cs.onSurfaceVariant,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

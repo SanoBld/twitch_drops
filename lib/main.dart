@@ -21,11 +21,7 @@ void main() async {
     size: const Size(960, 660),
     minimumSize: const Size(720, 520),
     center: true,
-    backgroundColor: Colors.transparent,
     title: 'Twitch Drops Miner',
-    // Hides the native OS title bar/border — app.dart draws its own
-    // custom title bar (drag area + min/max/close) instead.
-    titleBarStyle: TitleBarStyle.hidden,
   );
   await windowManager.waitUntilReadyToShow(windowOptions, () async {
     await windowManager.show();
